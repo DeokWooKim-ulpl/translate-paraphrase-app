@@ -1,0 +1,9 @@
+{
+  "config_version": 1,
+  "title": "글 작업대",
+  "artifact_url": "https://claude.ai/artifact/KgQrKRabv1a17keoh9Uaop",
+  "file_path": "app/index.html",
+  "capabilities": {"db": {}, "sample": {}},
+  "db_collections": {"history": "실행 기록 {tool, lang, mode, input, output, notes, sources, tier, at}", "library": "서재 자료 {title, kind, text, orig, chars, at}"},
+  "app_version": "1.0.0"
+}
