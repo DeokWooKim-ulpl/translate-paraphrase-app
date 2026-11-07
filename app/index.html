@@ -1,4 +1,4 @@
-<title>글 작업대</title>
+<title>번역 및 패러프레이징 앱</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+KR:wght@600;700&display=swap">
@@ -69,18 +69,6 @@ button.act.main[disabled]{background:var(--mute-soft);border-color:var(--line);c
 .msg.err{color:var(--bad)}.msg.good{color:var(--good)}
 select.lang{font:inherit;font-size:13.5px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:4px 8px}
 input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;width:100%;min-width:0}
-/* 리서치 */
-.lib{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px}
-@media (max-width:760px){.lib{grid-template-columns:1fr}}
-.src{border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;gap:8px;align-items:flex-start;background:var(--bg);font-size:13.5px}
-.src input{margin-top:5px}
-.src .t{flex:1;min-width:0}
-.src .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.src button{font-size:12px;padding:1px 6px}
-.drop{border:1px dashed var(--line);border-radius:6px;padding:14px;text-align:center;color:var(--muted);font-size:13.5px;background:var(--bg)}
-.drop.on{border-color:var(--accent);background:var(--accent-soft)}
-.srclist{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto}
-.cite{font-family:var(--f-mono);font-size:12px;color:var(--accent)}
 /* 기록 */
 .hist{border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:var(--bg);font-size:13.5px;display:flex;flex-direction:column;gap:4px}
 .hist .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -95,18 +83,16 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
 
 <div class="wrap">
   <div class="head">
-    <h1>글 작업대</h1>
-    <span class="meta">고치기 · 바꿔 쓰기 · 옮기기 · 자료로 초안 쓰기</span>
+    <h1>번역 및 패러프레이징 앱</h1>
     <span class="sp"></span>
     <label class="meta" for="tier">답 모델</label>
-    <select id="tier" aria-label="답 모델"><option value="quick">빠름</option><option value="default" selected>보통</option><option value="complex">깊게</option></select>
+    <select id="tier" aria-label="답 모델"><option value="quick" selected>빠름 (Haiku 5.5)</option><option value="deep">깊게 (Sonnet 5.5)</option></select>
     <span id="dbstat" class="chip mute">저장소 확인 중</span>
   </div>
 
   <nav class="top" role="tablist" aria-label="기능">
-    <button type="button" role="tab" data-tab="polish" aria-selected="true">고치기·바꿔쓰기</button>
-    <button type="button" role="tab" data-tab="translate" aria-selected="false">옮기기</button>
-    <button type="button" role="tab" data-tab="research" aria-selected="false">자료 초안</button>
+    <button type="button" role="tab" data-tab="polish" aria-selected="true">교정·패러프레이즈</button>
+    <button type="button" role="tab" data-tab="translate" aria-selected="false">번역</button>
     <button type="button" role="tab" data-tab="history" aria-selected="false">기록 <span id="histn" class="chip mute">0</span></button>
   </nav>
 
@@ -118,8 +104,8 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <button type="button" data-v="ko" aria-selected="false">한국어</button>
       </nav>
       <nav class="sub" aria-label="방식" id="p-mode">
-        <button type="button" data-v="fix" aria-selected="true">고치기</button>
-        <span class="sep">바꿔 쓰기 ·</span>
+        <button type="button" data-v="fix" aria-selected="true">교정</button>
+        <span class="sep">패러프레이즈 ·</span>
         <button type="button" data-v="standard" aria-selected="false">표준</button>
         <button type="button" data-v="formal" aria-selected="false">격식</button>
         <button type="button" data-v="academic" aria-selected="false">학술적</button>
@@ -134,14 +120,14 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
       <div class="two">
         <div>
           <div class="bar"><span>단어 <span class="cnt" id="p-w">0</span></span><span>글자 <span class="cnt" id="p-c">0</span></span><span class="sp" style="flex:1"></span><span class="msg" id="p-hint"></span></div>
-          <textarea id="p-in" placeholder="고칠 영어 글을 여기에 적거나 붙여 넣으세요" aria-label="다듬을 글"></textarea>
-          <div class="bar bottom"><button type="button" class="act" id="p-copy-in">복사하기</button><div class="row"><button type="button" class="act" id="p-clear">지우기</button><button type="button" class="act main" id="p-run" disabled>고치기</button></div></div>
+          <textarea id="p-in" placeholder="영어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)" aria-label="다듬을 글"></textarea>
+          <div class="bar bottom"><button type="button" class="act" id="p-copy-in">복사하기</button><div class="row"><button type="button" class="act" id="p-clear">지우기</button><button type="button" class="act main" id="p-run" disabled>교정하기</button></div></div>
         </div>
         <div>
           <div class="bar"><span>결과</span><span class="msg" id="p-msg"></span><span class="sp" style="flex:1"></span><button type="button" class="act" id="p-stop" hidden>멈추기</button></div>
-          <div class="out empty" id="p-out">고친 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.</div>
+          <div class="out empty" id="p-out">교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.</div>
           <div class="notes hidden" id="p-notes"></div>
-          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시</button><button type="button" class="act" id="p-use" disabled>결과를 입력으로</button><button type="button" class="act" id="p-tr" disabled>옮기기로 보내기</button></div></div>
+          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시</button><button type="button" class="act" id="p-use" disabled>결과를 입력으로</button><button type="button" class="act" id="p-tr" disabled>번역으로 보내기</button></div></div>
         </div>
       </div>
     </div>
@@ -151,10 +137,6 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
   <section id="tab-translate" role="tabpanel" hidden>
     <div class="panel">
       <div class="row">
-        <nav class="sub" aria-label="입력 종류" id="t-kind" style="margin-right:8px">
-          <button type="button" data-v="text" aria-selected="true">글</button>
-          <button type="button" data-v="doc" aria-selected="false">문서</button>
-        </nav>
         <select class="lang" id="t-src" aria-label="원문 언어"><option value="auto">언어 감지</option><option value="ko">한국어</option><option value="en">영어</option><option value="ja">일본어</option><option value="zh">중국어</option></select>
         <button type="button" class="act" id="t-swap" title="바꾸기">⇄</button>
         <select class="lang" id="t-dst" aria-label="번역 언어"><option value="ko">한국어</option><option value="en" selected>영어</option><option value="ja">일본어</option><option value="zh">중국어</option></select>
@@ -171,64 +153,16 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <button type="button" data-v="shorter" aria-selected="false">짧게</button>
         <button type="button" data-v="simple" aria-selected="false">쉽게</button>
       </nav>
-      <div id="t-docbox" class="hidden" style="display:flex;flex-direction:column;gap:8px">
-        <div class="drop" id="t-drop">
-          <div>옮길 md · txt · PDF 파일을 끌어다 놓거나</div>
-          <div class="row" style="justify-content:center;margin-top:6px"><label class="act" style="cursor:pointer;display:inline-block;border:1px solid var(--line);border-radius:5px;padding:5px 12px;font-size:13.5px;background:var(--paper)">파일 고르기<input type="file" id="t-file" accept=".md,.txt,.pdf,text/plain,text/markdown,application/pdf" hidden></label></div>
-          <div class="msg" id="t-fmsg">문서는 약 5,000자씩 잘라 차례로 옮기고, 마치면 원문과 함께 서재에 담을 수 있습니다.</div>
-        </div>
-      </div>
       <div class="two">
         <div>
-          <div class="bar"><span id="t-docname" class="chip ac hidden"></span><span>단어 <span class="cnt" id="t-w">0</span></span><span>글자 <span class="cnt" id="t-c">0</span></span></div>
-          <textarea id="t-in" placeholder="옮길 글을 여기에 적거나 붙여 넣으세요" aria-label="번역할 글"></textarea>
-          <div class="bar bottom"><button type="button" class="act" id="t-copy-in">복사하기</button><div class="row"><button type="button" class="act" id="t-clear">지우기</button><button type="button" class="act main" id="t-run" disabled>옮기기</button></div></div>
+          <div class="bar"><span>단어 <span class="cnt" id="t-w">0</span></span><span>글자 <span class="cnt" id="t-c">0</span></span></div>
+          <textarea id="t-in" placeholder="다른 언어로 번역할 글을 여기에 적거나 붙여 넣으세요" aria-label="번역할 글"></textarea>
+          <div class="bar bottom"><button type="button" class="act" id="t-copy-in">복사하기</button><div class="row"><button type="button" class="act" id="t-clear">지우기</button><button type="button" class="act main" id="t-run" disabled>번역하기</button></div></div>
         </div>
         <div>
           <div class="bar"><span>단어 <span class="cnt" id="t-ow">0</span></span><span>글자 <span class="cnt" id="t-oc">0</span></span><span class="msg" id="t-msg"></span><span class="sp" style="flex:1"></span><button type="button" class="act" id="t-stop" hidden>멈추기</button></div>
-          <div class="out empty" id="t-out">옮긴 글이 여기에 뜹니다.</div>
-          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시</button><button type="button" class="act" id="t-para" disabled>바꿔 쓰기</button><button type="button" class="act" id="t-fix" disabled>고치기</button><button type="button" class="act" id="t-lib" disabled>서재에 담기</button></div></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== 리서치 ===== -->
-  <section id="tab-research" role="tabpanel" hidden>
-    <div class="panel">
-      <h2>자료 초안</h2>
-      <p class="meta">서재에 담은 자료(옮겨 둔 문서, md, PDF)만 근거로 삼아 영어 초안을 씁니다. 근거가 있는 문장 끝에 <span class="cite">[1]</span>처럼 번호를 답니다. 자료 없이 요청만으로 쓰려면 아래 칸을 켜세요.</p>
-      <div class="lib">
-        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
-          <div class="row"><h3 style="flex:1">서재 <span class="chip mute" id="r-n">0편</span></h3><button type="button" class="act" id="r-all">모두 선택</button></div>
-          <div class="drop" id="r-drop">
-            <div>md · txt · PDF 파일을 끌어다 놓거나</div>
-            <div class="row" style="justify-content:center;margin-top:6px"><label class="act" style="cursor:pointer;display:inline-block;border:1px solid var(--line);border-radius:5px;padding:5px 12px;font-size:13.5px;background:var(--paper)">파일 올리기<input type="file" id="r-file" multiple accept=".md,.txt,.pdf,text/plain,text/markdown,application/pdf" hidden></label><button type="button" class="act" id="r-paste">글 붙여넣기</button></div>
-            <div class="msg" id="r-fmsg"></div>
-          </div>
-          <div id="r-pastebox" class="hidden" style="display:flex;flex-direction:column;gap:6px">
-            <input class="txt" id="r-ptitle" placeholder="자료 제목 (예: 2024_Kim_PDH)">
-            <textarea id="r-ptext" style="min-height:120px;border:1px solid var(--line);border-radius:5px" placeholder="번역해 둔 md 내용이나 초록·본문을 붙여넣으세요"></textarea>
-            <div class="row"><button type="button" class="act main" id="r-padd">서재에 담기</button><button type="button" class="act" id="r-pcancel">취소</button></div>
-          </div>
-          <div class="srclist" id="r-list"><div class="msg">아직 담은 자료가 없습니다. 위에서 파일을 올리거나 글을 붙여넣으세요.</div></div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
-          <div class="two" style="grid-template-columns:1fr">
-            <div>
-              <div class="bar"><span>초안 요청</span><span class="msg">한국어로 적어도 됩니다. 어떤 절(Introduction, Methods…)인지, 주장·순서를 적으면 좋습니다.</span></div>
-              <textarea id="r-ask" style="min-height:120px" placeholder="예: 공진기 길이 안정화에서 PDH 방식이 왜 필요한지, 선행 연구 [1][2]의 한계를 들어 Introduction 두 문단으로."></textarea>
-              <div class="bar bottom"><div class="row"><label class="meta"><input type="checkbox" id="r-nosrc"> 자료 없이 요청만으로 쓰기</label><span class="msg" id="r-sel">선택한 자료 0편</span></div><div class="row"><button type="button" class="act main" id="r-run" disabled>초안 쓰기</button></div></div>
-            </div>
-          </div>
-          <div class="two" style="grid-template-columns:1fr">
-            <div>
-              <div class="bar"><span>영어 초안</span><span class="msg" id="r-msg"></span><span class="sp" style="flex:1"></span><button type="button" class="act" id="r-stop" hidden>멈추기</button></div>
-              <div class="out empty" id="r-out">초안이 여기에 나타납니다.</div>
-              <div class="notes hidden" id="r-refs"></div>
-              <div class="bar bottom"><button type="button" class="act" id="r-copy" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="r-again" disabled>다시</button><button type="button" class="act" id="r-para" disabled>바꿔 쓰기</button><button type="button" class="act" id="r-fix" disabled>고치기</button></div></div>
-            </div>
-          </div>
+          <div class="out empty" id="t-out">번역한 글이 여기에 뜹니다.</div>
+          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시</button><button type="button" class="act" id="t-para" disabled>패러프레이즈</button><button type="button" class="act" id="t-fix" disabled>교정하기</button></div></div>
         </div>
       </div>
     </div>
@@ -238,15 +172,14 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
   <section id="tab-history" role="tabpanel" hidden>
     <div class="panel">
       <div class="row"><h2 style="flex:1">기록</h2><input class="txt" id="h-q" placeholder="검색" style="max-width:240px"><button type="button" class="act" id="h-clear">전체 삭제</button></div>
-      <p class="meta">고치기·바꿔쓰기·옮기기·초안 결과가 쌓입니다. 저장소가 있으면 claude.ai에 영구 저장되고, 없으면 이 브라우저에만 남습니다.</p>
+      <p class="meta">교정·패러프레이즈·번역 결과가 쌓입니다. 저장소가 있으면 claude.ai에 영구 저장되고, 없으면 이 브라우저에만 남습니다.</p>
       <div id="h-list" style="display:flex;flex-direction:column;gap:8px"><div class="msg">아직 기록이 없습니다.</div></div>
     </div>
   </section>
 
-  <div class="foot">레이저·광학 연구용 글 작업대. Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.0.0</div>
+  <div class="foot">레이저·광학 연구용. Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.1.0</div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 (function(){
 'use strict';
@@ -287,17 +220,15 @@ function trRules(src,dst,style){
   return 'Translate the text '+(src==='auto'?'(detect its language) ':'from '+LANGNAME[src]+' ')+'into '+LANGNAME[dst]+'. Domain: physics / laser / photonics research; use standard technical terminology and keep numbers, units, LaTeX, citations, line breaks and list structure. '+
   STYLE[style]+'\nOutput format, strictly: first line "LANG: <detected source language in English>", then a line containing only ---, then the translation only. No other commentary.';
 }
-var RESEARCH_RULES='You write an English research-paper draft for a physicist (laser/photonics). Use ONLY the sources given below as evidence. Every factual sentence that relies on a source ends with its bracket number, e.g. [2]. Do not invent results, numbers or references. If the sources do not support something the request asks for, say so briefly in a bracketed note like [note: not supported by the sources] rather than inventing it. Academic register, hedged appropriately, consistent terminology, LaTeX for math.\n'+
-  'Output format, strictly: the draft text, then a line containing only ---, then one line per source actually cited: "[n] <title>: <one Korean sentence on what was taken from it>".';
-var RESEARCH_FREE='You write an English research-paper draft for a physicist (laser/photonics) from the request alone, with no sources. Mark every claim that would need a citation with [ref?]. Academic register, LaTeX for math. Output only the draft text.';
-var MAX_SRC_CHARS=60000;   /* 자료 1편당 보낼 최대 글자 */
-var MAX_PROMPT=240000;     /* sample 입력 상한(262144 B) 아래로 */
 
 /* ---------- 공통 ---------- */
 var sampleP=window.claude?claude.use('sample'):Promise.resolve(null);
 var dbP=window.claude?claude.use('db'):Promise.resolve(null);
-var tier=$('tier');tier.value=LS('tier')||'default';tier.addEventListener('change',function(){LS('tier',tier.value);});
-sampleP.then(function(s){if(!s)return;s.limits().then(function(l){if(l&&l.modelTiers){Array.prototype.forEach.call(tier.options,function(o){o.disabled=l.modelTiers.indexOf(o.value)<0;});if(tier.options[tier.selectedIndex].disabled)tier.value='default';}}).catch(function(){});});
+var tier=$('tier');tier.value=LS('tier')||'quick';if(!tier.value)tier.value='quick';tier.addEventListener('change',function(){LS('tier',tier.value);});
+/* 모델 선택: 빠름 = Haiku 5.5 · 깊게 = Sonnet 5.5, 둘 다 effort medium. 그 모델을 못 쓰는 계정이면 claude.ai가 같은 등급(modelTier)으로 대신 답함 */
+var MODELS={quick:{model:'claude-haiku-5-5',modelTier:'quick',effort:'medium',label:'Haiku 5.5'},deep:{model:'claude-sonnet-5-5',modelTier:'default',effort:'medium',label:'Sonnet 5.5'}};
+function modelOpts(){return MODELS[tier.value]||MODELS.quick;}
+function appliedLabel(r){var m=modelOpts();if(r.modelApplied)return m.label+' · medium';return ({quick:'빠름 등급',default:'보통 등급',complex:'깊게 등급'}[r.modelTierApplied]||'')+' (대신 답함)';}
 function wc(s){s=s.trim();return s?s.split(/\s+/).length:0;}
 function cc(s){return Array.from(s).length;}
 function fmt(n){return n.toLocaleString('en-US');}
@@ -315,8 +246,8 @@ async function ask(prompt,box,msgEl,stopBtn,onText){
   var ctl=new AbortController();stopBtn.hidden=false;stopBtn.onclick=function(){ctl.abort();};
   box.classList.remove('empty');box.classList.add('busy');box.textContent='생각하는 중…';msgEl.className='msg';msgEl.textContent='';
   try{
-    var r=await s(prompt,{modelTier:tier.value,cache:false,signal:ctl.signal,onText:function(u){box.textContent=onText?onText(u.text):u.text;}});
-    msgEl.textContent=(r.truncated?'답이 잘렸습니다. 글을 나눠서 다시 해 보세요. ':'')+'· '+({quick:'빠름',default:'보통',complex:'깊게'}[r.modelTierApplied||tier.value]||'');
+    var mo=modelOpts();var r=await s(prompt,{model:mo.model,modelTier:mo.modelTier,effort:mo.effort,cache:false,signal:ctl.signal,onText:function(u){box.textContent=onText?onText(u.text):u.text;}});
+    msgEl.textContent=(r.truncated?'답이 잘렸습니다. 글을 나눠서 다시 해 보세요. ':'')+'· '+appliedLabel(r);
     return r.text;
   }catch(e){msgEl.className='msg err';msgEl.textContent=errText(e);if(e&&e.text){return e.text;}return null;}
   finally{stopBtn.hidden=true;box.classList.remove('busy');}
@@ -336,30 +267,25 @@ function splitNotes(t){var k=t.indexOf('\n---');if(k<0)return [t.trim(),''];retu
 function renderNotes(box,notes){box.innerHTML='';if(!notes){box.classList.add('hidden');return;}box.classList.remove('hidden');var ul=el('ul');notes.split('\n').forEach(function(l){l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(el('div',{class:'label'},'바뀐 곳'));box.appendChild(ul);}
 
 /* ---------- 저장(db / localStorage) ---------- */
-var db=null,hist=[],lib=[];
+var db=null,hist=[];
 var dbstat=$('dbstat');
-function localLoad(){try{hist=JSON.parse(LS('hist')||'[]');lib=JSON.parse(LS('lib')||'[]');}catch(e){hist=[];lib=[];}}
-function localSave(){LS('hist',JSON.stringify(hist.slice(0,200)));try{LS('lib',JSON.stringify(lib));}catch(e){}}
+function localLoad(){try{hist=JSON.parse(LS('hist')||'[]');}catch(e){hist=[];}}
+function localSave(){LS('hist',JSON.stringify(hist.slice(0,200)));}
 function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 async function saveHist(rec){rec.id=newId();rec.at=new Date().toISOString();
   if(db){try{await db.doc('history/'+rec.id).set(rec);return;}catch(e){console.warn(e);}}
   hist.unshift(rec);localSave();renderHist();}
 async function delHist(id){if(db){try{await db.doc('history/'+id).delete();return;}catch(e){}}hist=hist.filter(function(h){return h.id!==id;});localSave();renderHist();}
-async function saveLib(rec){rec.id=newId();rec.at=new Date().toISOString();rec.chars=cc(rec.text);
-  if(db){try{await db.doc('library/'+rec.id).set(rec);return true;}catch(e){console.warn(e);$('r-fmsg').textContent='저장 실패: '+errText(e);return false;}}
-  lib.unshift(rec);localSave();renderLib();return true;}
-async function delLib(id){if(db){try{await db.doc('library/'+id).delete();return;}catch(e){}}lib=lib.filter(function(h){return h.id!==id;});localSave();renderLib();}
-localLoad();renderHist();renderLib();
+localLoad();renderHist();
 dbP.then(function(d){
   if(!d){dbstat.textContent='이 브라우저에만 저장';dbstat.className='chip mute';return;}
   db=d;dbstat.textContent='저장소 연결됨';dbstat.className='chip ok';
   var t1=setTimeout(function(){dbstat.textContent='저장소 응답 없음';dbstat.className='chip mid';},10000);
   d.collection('history').orderBy('at','desc').limit(300).onSnapshot(function(snap){clearTimeout(t1);hist=snap.docs.map(function(x){return x.data();});renderHist();},function(e){clearTimeout(t1);dbstat.textContent='저장소 오류';dbstat.className='chip no';console.warn(e);});
-  d.collection('library').orderBy('at','desc').limit(500).onSnapshot(function(snap){lib=snap.docs.map(function(x){return x.data();});renderLib();},function(e){console.warn(e);});
 });
 
 /* ---------- 큰 탭 ---------- */
-var TABS=['polish','translate','research','history'];
+var TABS=['polish','translate','history'];
 function showTab(t){if(TABS.indexOf(t)<0)t='polish';document.querySelectorAll('nav.top button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===t?'true':'false');});TABS.forEach(function(x){$('tab-'+x).hidden=x!==t;});if(location.hash!=='#'+t){try{history.replaceState(null,'',"#"+t);}catch(e){}}}
 document.querySelector('nav.top').addEventListener('click',function(e){var b=e.target.closest('button[data-tab]');if(b)showTab(b.dataset.tab);});
 window.addEventListener('hashchange',function(){showTab(location.hash.slice(1));});
@@ -371,10 +297,10 @@ var pLang='en',pMode='fix';
 function pUI(){var ko=pLang==='ko';
   $('p-mode').querySelectorAll('button[data-ko]').forEach(function(b){b.hidden=!ko;});
   if(!ko&&['cover','report','article'].indexOf(pMode)>=0){pMode='standard';pick($('p-mode'),'standard');}
-  pIn.placeholder=ko?'고칠 한국어 글을 여기에 적거나 붙여 넣으세요':'고칠 영어 글을 여기에 적거나 붙여 넣으세요';
+  pIn.placeholder=ko?'한국어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)':'영어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)';
   $('p-hint').textContent=pMode==='fix'?(ko?'맞춤법·띄어쓰기·문법·어색한 표현을 고칩니다':'문법·철자·관사·어색한 표현을 고칩니다'):'뜻은 그대로 두고 표현을 바꿉니다';
-  pRun.textContent=pMode==='fix'?'고치기':'바꿔 쓰기';
-  if(pOut.classList.contains('empty'))pOut.textContent=pMode==='fix'?'고친 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'바꿔 쓴 글이 여기에 뜹니다.';
+  pRun.textContent=pMode==='fix'?'교정하기':'패러프레이즈';
+  if(pOut.classList.contains('empty'))pOut.textContent=pMode==='fix'?'교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'패러프레이즈한 글이 여기에 뜹니다.';
   pCount();}
 function pCount(){var t=pIn.value;$('p-w').textContent=fmt(wc(t));$('p-c').textContent=fmt(cc(t));pRun.disabled=!t.trim();}
 sub($('p-lang'),function(v){pLang=v;pUI();});sub($('p-mode'),function(v){pMode=v;pUI();});
@@ -395,7 +321,7 @@ async function runPolish(){
   if(isFix){var sp=splitNotes(raw);out=sp[0];notes=sp[1];var frag=diffHTML(text,out);pOut.textContent='';if(frag)pOut.appendChild(frag);else pOut.textContent=out;renderNotes($('p-notes'),notes);}
   else{pOut.textContent=out;}
   pLast={text:text,out:out};['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=false;});
-  saveHist({tool:isFix?'고치기':'바꿔쓰기',lang:pLang,mode:pMode,input:text,output:out,notes:notes.slice(0,4000),tier:tier.value});
+  saveHist({tool:isFix?'교정':'패러프레이즈',lang:pLang,mode:pMode,input:text,output:out,notes:notes.slice(0,4000),tier:tier.value});
 }
 pRun.onclick=runPolish;$('p-again').onclick=runPolish;
 
@@ -404,31 +330,11 @@ var tIn=$('t-in'),tOut=$('t-out'),tRun=$('t-run'),tLast={text:'',out:''},tStyle=
 function tCount(){var t=tIn.value;$('t-w').textContent=fmt(wc(t));$('t-c').textContent=fmt(cc(t));tRun.disabled=!t.trim();}
 function tOutCount(t){$('t-ow').textContent=fmt(wc(t));$('t-oc').textContent=fmt(cc(t));}
 tIn.addEventListener('input',tCount);sub($('t-style'),function(v){tStyle=v;});
-var tKind='text',tDoc=null;
-sub($('t-kind'),function(v){tKind=v;$('t-docbox').classList.toggle('hidden',v!=='doc');$('t-docname').classList.toggle('hidden',v!=='doc'||!tDoc);});
-async function loadDoc(f){var m=$('t-fmsg');m.className='msg';m.textContent=f.name+' 읽는 중…';
-  try{var text=(/\.pdf$/i.test(f.name)||f.type==='application/pdf')?await pdfText(f):await f.text();text=(text||'').trim();if(!text)throw new Error('글자를 찾지 못했습니다 (스캔 PDF면 md로 변환해 올리세요)');
-    tDoc={name:f.name.replace(/\.(md|txt|pdf)$/i,'')};tIn.value=text;tCount();$('t-docname').textContent=tDoc.name;$('t-docname').classList.remove('hidden');
-    m.className='msg good';m.textContent=f.name+' · '+fmt(cc(text))+'자 · 약 '+Math.ceil(cc(text)/CHUNK)+'번에 나눠 옮깁니다.';
-  }catch(e){m.className='msg err';m.textContent=f.name+': '+errText(e);}}
-$('t-file').addEventListener('change',function(){if(this.files[0])loadDoc(this.files[0]);this.value='';});
-var tdrop=$('t-drop');['dragenter','dragover'].forEach(function(ev){tdrop.addEventListener(ev,function(e){e.preventDefault();tdrop.classList.add('on');});});
-['dragleave','drop'].forEach(function(ev){tdrop.addEventListener(ev,function(e){e.preventDefault();tdrop.classList.remove('on');});});
-tdrop.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files[0])loadDoc(e.dataTransfer.files[0]);});
 var CHUNK=5000;
 function chunks(t){var out=[],cur='';t.split(/\n{2,}/).forEach(function(p){if(cur&&cc(cur)+cc(p)>CHUNK){out.push(cur);cur='';}if(cc(p)>CHUNK){var s=p.split(/(?<=[.!?。])\s+/);s.forEach(function(x){if(cur&&cc(cur)+cc(x)>CHUNK){out.push(cur);cur='';}cur+=(cur?' ':'')+x;});}else{cur+=(cur?'\n\n':'')+p;}});if(cur)out.push(cur);return out;}
-$('t-lib').onclick=async function(){var b=this;b.disabled=true;var ok=await saveLib({title:(tDoc?tDoc.name:tLast.text.slice(0,40))+' (옮긴 글)',kind:'옮긴 글',text:tLast.out.slice(0,MAX_SRC_CHARS*2),orig:tLast.text.slice(0,MAX_SRC_CHARS)});
-  $('t-msg').className='msg '+(ok?'good':'err');$('t-msg').textContent=ok?'서재에 담았습니다 (자료 초안 탭에서 보입니다).':'서재 저장 실패';b.disabled=!ok;};
-$('t-swap').onclick=function(){var s=$('t-src'),d=$('t-dst');var sv=s.value==='auto'?($('t-det').dataset.l||'en'):s.value,dv=d.value;s.value=dv;d.value=sv;if(tLast.out){tIn.value=tLast.out;tCount();}};
-$('t-clear').onclick=function(){tIn.value='';tCount();tIn.focus();};
-$('t-copy-in').onclick=function(){copyText(tIn.value,this);};
-$('t-copy-out').onclick=function(){copyText(tLast.out,this);};
-function toPolish(text,mode){pIn.value=text;var ko=/[가-힣]/.test(text)&&(text.match(/[가-힣]/g)||[]).length>cc(text)*0.2;pLang=ko?'ko':'en';pick($('p-lang'),pLang);pMode=mode;pick($('p-mode'),mode);pUI();showTab('polish');}
-$('t-para').onclick=function(){toPolish(tLast.out,'standard');};
-$('t-fix').onclick=function(){toPolish(tLast.out,'fix');};
 function tDetect(head){var m=/^LANG:\s*(.+)$/m.exec(head||'');if(m){$('t-det').textContent='감지: '+m[1].trim();var l=m[1].toLowerCase();$('t-det').dataset.l=/korean/.test(l)?'ko':/japan/.test(l)?'ja':/chin/.test(l)?'zh':'en';}}
 async function runTr(){
-  var text=tIn.value.trim();if(!text)return;tRun.disabled=true;['t-copy-out','t-again','t-para','t-fix','t-lib'].forEach(function(i){$(i).disabled=true;});
+  var text=tIn.value.trim();if(!text)return;tRun.disabled=true;['t-copy-out','t-again','t-para','t-fix'].forEach(function(i){$(i).disabled=true;});
   var src=$('t-src').value,dst=$('t-dst').value,rules=trRules(src,dst,tStyle),out='';
   var parts=cc(text)>CHUNK*1.2?chunks(text):[text];
   for(var i=0;i<parts.length;i++){
@@ -439,65 +345,10 @@ async function runTr(){
     var sp=splitNotes(raw);if(i===0)tDetect(sp[0]);out+=(out?'\n\n':'')+(sp[1]||sp[0]).trim();
   }
   tRun.disabled=false;if(parts.length>1&&$('t-msg').className!=='msg err'){$('t-msg').className='msg good';$('t-msg').textContent=parts.length+' 조각을 모두 옮겼습니다.';}
-  tOut.textContent=out;tOutCount(out);tLast={text:text,out:out};['t-copy-out','t-again','t-para','t-fix','t-lib'].forEach(function(i){$(i).disabled=false;});
-  saveHist({tool:'옮기기',lang:src+'→'+dst,mode:tStyle+(tDoc?' · '+tDoc.name:''),input:text.slice(0,20000),output:out.slice(0,60000),tier:tier.value});
+  tOut.textContent=out;tOutCount(out);tLast={text:text,out:out};['t-copy-out','t-again','t-para','t-fix'].forEach(function(i){$(i).disabled=false;});
+  saveHist({tool:'번역',lang:src+'→'+dst,mode:tStyle,input:text.slice(0,20000),output:out.slice(0,60000),tier:tier.value});
 }
 tRun.onclick=runTr;$('t-again').onclick=runTr;tCount();
-
-/* ---------- 리서치 ---------- */
-var rSel={};
-function renderLib(){var box=$('r-list');box.innerHTML='';$('r-n').textContent=lib.length+'편';
-  if(!lib.length){box.appendChild(el('div',{class:'msg'},'아직 담은 자료가 없습니다. 위에서 파일을 올리거나 글을 붙여넣으세요.'));rSelMsg();return;}
-  lib.forEach(function(s){var d=el('div',{class:'src'});var ck=el('input',{type:'checkbox','aria-label':s.title});ck.checked=!!rSel[s.id];ck.onchange=function(){rSel[s.id]=ck.checked;rSelMsg();};
-    var t=el('div',{class:'t'});t.appendChild(el('b',null,s.title));t.appendChild(el('span',{class:'meta'},(s.kind?s.kind+' · ':'')+fmt(s.chars||cc(s.text||''))+'자 · '+(s.at||'').slice(0,10)));
-    var x=el('button',{type:'button',class:'act',title:'서재에서 빼기'},'빼기');x.onclick=function(){if(x.dataset.c){delLib(s.id);}else{x.dataset.c='1';x.textContent='정말?';setTimeout(function(){x.dataset.c='';x.textContent='빼기';},2500);}};
-    d.appendChild(ck);d.appendChild(t);d.appendChild(x);box.appendChild(d);});rSelMsg();}
-function selected(){return lib.filter(function(s){return rSel[s.id];});}
-function rSelMsg(){var n=selected().length;$('r-sel').textContent='선택한 자료 '+n+'편';rRunUI();}
-function rRunUI(){$('r-run').disabled=!$('r-ask').value.trim()||(!$('r-nosrc').checked&&!selected().length);}
-$('r-ask').addEventListener('input',rRunUI);$('r-nosrc').addEventListener('change',rRunUI);
-$('r-all').onclick=function(){var all=lib.every(function(s){return rSel[s.id];});lib.forEach(function(s){rSel[s.id]=!all;});renderLib();};
-$('r-paste').onclick=function(){$('r-pastebox').classList.remove('hidden');$('r-ptitle').focus();};
-$('r-pcancel').onclick=function(){$('r-pastebox').classList.add('hidden');};
-$('r-padd').onclick=async function(){var t=$('r-ptext').value.trim(),ti=$('r-ptitle').value.trim();if(!t)return;if(await saveLib({title:ti||t.slice(0,40),text:t.slice(0,MAX_SRC_CHARS*2)})){$('r-ptext').value='';$('r-ptitle').value='';$('r-pastebox').classList.add('hidden');}};
-async function pdfText(file){
-  if(!window.pdfjsLib)throw new Error('PDF 라이브러리를 불러오지 못했습니다');
-  try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}
-  var buf=await file.arrayBuffer();var pdf=await pdfjsLib.getDocument({data:buf,disableWorker:true}).promise;var parts=[];
-  for(var p=1;p<=pdf.numPages;p++){var pg=await pdf.getPage(p);var tc=await pg.getTextContent();var line='',lastY=null;
-    tc.items.forEach(function(it){if(lastY!==null&&Math.abs(it.transform[5]-lastY)>2){line+='\n';}line+=it.str+(it.hasEOL?'\n':' ');lastY=it.transform[5];});parts.push(line);}
-  return parts.join('\n\n').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n');
-}
-async function addFiles(files){var msg=$('r-fmsg');var n=0;
-  for(var i=0;i<files.length;i++){var f=files[i];msg.className='msg';msg.textContent=f.name+' 읽는 중…';
-    try{var text;if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){text=await pdfText(f);}else{text=await f.text();}
-      text=(text||'').trim();if(!text){throw new Error('글자를 찾지 못했습니다 (스캔 PDF면 md로 변환해 올리세요)');}
-      if(await saveLib({title:f.name.replace(/\.(md|txt|pdf)$/i,''),text:text.slice(0,MAX_SRC_CHARS*2)}))n++;
-    }catch(e){msg.className='msg err';msg.textContent=f.name+': '+errText(e);await new Promise(function(r){setTimeout(r,1500);});}}
-  msg.className='msg good';msg.textContent=n?n+'편을 서재에 담았습니다.':'';}
-$('r-file').addEventListener('change',function(){addFiles(this.files);this.value='';});
-var drop=$('r-drop');['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('on');});});
-['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove('on');});});
-drop.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files.length)addFiles(e.dataTransfer.files);});
-var rLast='';
-async function runResearch(){
-  var ask_=$('r-ask').value.trim();if(!ask_)return;var free=$('r-nosrc').checked;var srcs=free?[]:selected();
-  $('r-run').disabled=true;$('r-refs').classList.add('hidden');['r-copy','r-again','r-para','r-fix'].forEach(function(i){$(i).disabled=true;});
-  var prompt;
-  if(free){prompt=RESEARCH_FREE+'\n\nREQUEST:\n'+ask_;}
-  else{var budget=MAX_PROMPT-RESEARCH_RULES.length-ask_.length-500,per=Math.min(MAX_SRC_CHARS,Math.floor(budget/srcs.length));
-    prompt=RESEARCH_RULES+'\n\nREQUEST:\n'+ask_+'\n\nSOURCES:\n'+srcs.map(function(s,i){var t=s.text||'';var cut=t.length>per;return '[' +(i+1)+'] '+s.title+'\n'+t.slice(0,per)+(cut?'\n[... truncated ...]':'');}).join('\n\n');
-    if(srcs.some(function(s){return (s.text||'').length>per;}))$('r-msg').textContent='자료가 길어 편당 '+fmt(per)+'자까지만 보냅니다.';}
-  var raw=await ask(prompt,$('r-out'),$('r-msg'),$('r-stop'),free?null:function(t){return splitNotes(t)[0]||t;});
-  $('r-run').disabled=false;if(raw==null){setOut($('r-out'),'결과를 받지 못했습니다.',true);return;}
-  var sp=free?[raw.trim(),'']:splitNotes(raw);rLast=sp[0];$('r-out').textContent=rLast;
-  if(sp[1]){var b=$('r-refs');b.innerHTML='';b.classList.remove('hidden');b.appendChild(el('div',{class:'label'},'인용한 자료'));var ul=el('ul');sp[1].split('\n').forEach(function(l){l=l.trim();if(l)ul.appendChild(el('li',null,l));});b.appendChild(ul);}
-  ['r-copy','r-again','r-para','r-fix'].forEach(function(i){$(i).disabled=false;});
-  saveHist({tool:'자료 초안',lang:'en',mode:free?'자료 없음':srcs.length+'편',input:ask_,output:rLast,notes:(sp[1]||'').slice(0,4000),sources:srcs.map(function(s){return s.title;}),tier:tier.value});
-}
-$('r-run').onclick=runResearch;$('r-again').onclick=runResearch;
-$('r-copy').onclick=function(){copyText(rLast,this);};
-$('r-para').onclick=function(){toPolish(rLast,'academic');};$('r-fix').onclick=function(){toPolish(rLast,'fix');};
 
 /* ---------- 기록 ---------- */
 function renderHist(){var box=$('h-list'),q=($('h-q').value||'').toLowerCase();box.innerHTML='';
@@ -509,8 +360,7 @@ function renderHist(){var box=$('h-list'),q=($('h-q').value||'').toLowerCase();b
     var sp=el('span',{style:'flex:1'});hd.appendChild(sp);
     var b1=el('button',{type:'button',class:'act'},'펼치기');b1.onclick=function(){d.classList.toggle('open');b1.textContent=d.classList.contains('open')?'접기':'펼치기';};
     var b2=el('button',{type:'button',class:'act'},'결과 복사');b2.onclick=function(){copyText(h.output||'',b2);};
-    var b3=el('button',{type:'button',class:'act'},'다시 열기');b3.onclick=function(){if(h.tool==='옮기기'){tIn.value=h.input;tCount();tOut.textContent=h.output;tOut.classList.remove('empty');tOutCount(h.output);tLast={text:h.input,out:h.output};['t-copy-out','t-again','t-para','t-fix','t-lib'].forEach(function(i){$(i).disabled=false;});showTab('translate');}
-      else if(h.tool==='자료 초안'){$('r-ask').value=h.input;$('r-out').textContent=h.output;$('r-out').classList.remove('empty');rLast=h.output;['r-copy','r-again','r-para','r-fix'].forEach(function(i){$(i).disabled=false;});rRunUI();showTab('research');}
+    var b3=el('button',{type:'button',class:'act'},'다시 열기');b3.onclick=function(){if(h.tool==='번역'){tIn.value=h.input;tCount();tOut.textContent=h.output;tOut.classList.remove('empty');tOutCount(h.output);tLast={text:h.input,out:h.output};['t-copy-out','t-again','t-para','t-fix'].forEach(function(i){$(i).disabled=false;});showTab('translate');}
       else{pIn.value=h.input;pLang=h.lang||'en';pick($('p-lang'),pLang);pMode=h.mode||'fix';pick($('p-mode'),pMode);pUI();pOut.classList.remove('empty');var fr=pMode==='fix'?diffHTML(h.input,h.output):null;pOut.textContent='';if(fr)pOut.appendChild(fr);else pOut.textContent=h.output;renderNotes($('p-notes'),h.notes||'');pLast={text:h.input,out:h.output};['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=false;});showTab('polish');}};
     var b4=el('button',{type:'button',class:'act'},'삭제');b4.onclick=function(){if(b4.dataset.c){delHist(h.id);}else{b4.dataset.c='1';b4.textContent='정말?';setTimeout(function(){b4.dataset.c='';b4.textContent='삭제';},2500);}};
     [b1,b2,b3,b4].forEach(function(b){hd.appendChild(b);});d.appendChild(hd);

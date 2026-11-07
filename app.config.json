@@ -1,9 +1,26 @@
 {
   "config_version": 1,
-  "title": "글 작업대",
+  "title": "번역 및 패러프레이징 앱",
   "artifact_url": "https://claude.ai/artifact/KgQrKRabv1a17keoh9Uaop",
   "file_path": "app/index.html",
-  "capabilities": {"db": {}, "sample": {}},
-  "db_collections": {"history": "실행 기록 {tool, lang, mode, input, output, notes, sources, tier, at}", "library": "서재 자료 {title, kind, text, orig, chars, at}"},
-  "app_version": "1.0.0"
+  "capabilities": {
+    "db": {},
+    "sample": {}
+  },
+  "db_collections": {
+    "history": "실행 기록 {tool, lang, mode, input, output, notes, tier, at}"
+  },
+  "app_version": "1.1.0",
+  "models": {
+    "quick": {
+      "model": "claude-haiku-5-5",
+      "modelTier": "quick",
+      "effort": "medium"
+    },
+    "deep": {
+      "model": "claude-sonnet-5-5",
+      "modelTier": "default",
+      "effort": "medium"
+    }
+  }
 }
