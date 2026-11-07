@@ -106,8 +106,11 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
       </nav>
       <nav class="sub" aria-label="방식" id="p-mode">
         <button type="button" data-v="fix" aria-selected="true">교정</button>
-        <span class="sep">패러프레이즈 ·</span>
-        <button type="button" data-v="standard" aria-selected="false">표준</button>
+        <button type="button" data-v="para" aria-selected="false">패러프레이즈</button>
+      </nav>
+      <nav class="sub" aria-label="문체" id="p-style" hidden>
+        <span class="sep">문체 ·</span>
+        <button type="button" data-v="standard" aria-selected="true">표준</button>
         <button type="button" data-v="formal" aria-selected="false">격식</button>
         <button type="button" data-v="academic" aria-selected="false">학술적</button>
         <button type="button" data-v="simple" aria-selected="false">쉽게</button>
@@ -178,7 +181,7 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
     </div>
   </section>
 
-  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.1.1</div>
+  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.1.2</div>
 </div>
 
 <script>
@@ -294,17 +297,20 @@ showTab(location.hash.slice(1)||LS('tab')||'polish');
 
 /* ---------- 다듬기 ---------- */
 var pIn=$('p-in'),pOut=$('p-out'),pRun=$('p-run'),pLast={text:'',out:''};
-var pLang='en',pMode='fix';
+var pLang='en',pMode='fix',pStyle='standard';
+/* 방식: 교정(fix) 또는 패러프레이즈(문체 pStyle). pMode = 'fix' 또는 문체 이름 */
+function setPMode(m){if(m==='fix'){pMode='fix';pick($('p-mode'),'fix');}else{pStyle=m;pMode=m;pick($('p-mode'),'para');pick($('p-style'),m);}}
 function pUI(){var ko=pLang==='ko';
-  $('p-mode').querySelectorAll('button[data-ko]').forEach(function(b){b.hidden=!ko;});
-  if(!ko&&['cover','report','article'].indexOf(pMode)>=0){pMode='standard';pick($('p-mode'),'standard');}
+  $('p-style').querySelectorAll('button[data-ko]').forEach(function(b){b.hidden=!ko;});
+  if(!ko&&['cover','report','article'].indexOf(pStyle)>=0){setPMode('standard');}
+  $('p-style').hidden=pMode==='fix';
   pIn.placeholder=ko?'한국어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)':'영어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)';
   $('p-hint').textContent=pMode==='fix'?(ko?'맞춤법·띄어쓰기·문법·어색한 표현을 고칩니다':'문법·철자·관사·어색한 표현을 고칩니다'):'뜻은 그대로 두고 표현을 바꿉니다';
   pRun.textContent=pMode==='fix'?'교정하기':'패러프레이즈';
   if(pOut.classList.contains('empty'))pOut.textContent=pMode==='fix'?'교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'패러프레이즈한 글이 여기에 뜹니다.';
   pCount();}
 function pCount(){var t=pIn.value;$('p-w').textContent=fmt(wc(t));$('p-c').textContent=fmt(cc(t));pRun.disabled=!t.trim();}
-sub($('p-lang'),function(v){pLang=v;pUI();});sub($('p-mode'),function(v){pMode=v;pUI();});
+sub($('p-lang'),function(v){pLang=v;pUI();});sub($('p-mode'),function(v){setPMode(v==='fix'?'fix':pStyle);pUI();});sub($('p-style'),function(v){setPMode(v);pUI();});
 pIn.addEventListener('input',pCount);pUI();
 $('p-clear').onclick=function(){pIn.value='';pCount();pIn.focus();};
 $('p-copy-in').onclick=function(){copyText(pIn.value,this);};
@@ -331,6 +337,14 @@ var tIn=$('t-in'),tOut=$('t-out'),tRun=$('t-run'),tLast={text:'',out:''},tStyle=
 function tCount(){var t=tIn.value;$('t-w').textContent=fmt(wc(t));$('t-c').textContent=fmt(cc(t));tRun.disabled=!t.trim();}
 function tOutCount(t){$('t-ow').textContent=fmt(wc(t));$('t-oc').textContent=fmt(cc(t));}
 tIn.addEventListener('input',tCount);sub($('t-style'),function(v){tStyle=v;});
+$('t-swap').onclick=function(){var sl=$('t-src'),d=$('t-dst');var sv=sl.value==='auto'?($('t-det').dataset.l||'en'):sl.value,dv=d.value;sl.value=dv;d.value=sv;if(tLast.out){tIn.value=tLast.out;tCount();}};
+$('t-clear').onclick=function(){tIn.value='';tCount();tIn.focus();};
+$('t-copy-in').onclick=function(){copyText(tIn.value,this);};
+$('t-copy-out').onclick=function(){copyText(tLast.out,this);};
+/* 번역 결과를 교정·패러프레이즈 탭으로: 한글 비율로 언어를 정함 */
+function toPolish(text,mode){pIn.value=text;var ko=(text.match(/[가-힣]/g)||[]).length>cc(text)*0.2;pLang=ko?'ko':'en';pick($('p-lang'),pLang);setPMode(mode);pUI();showTab('polish');}
+$('t-para').onclick=function(){toPolish(tLast.out,'standard');};
+$('t-fix').onclick=function(){toPolish(tLast.out,'fix');};
 var CHUNK=5000;
 function chunks(t){var out=[],cur='';t.split(/\n{2,}/).forEach(function(p){if(cur&&cc(cur)+cc(p)>CHUNK){out.push(cur);cur='';}if(cc(p)>CHUNK){var s=p.split(/(?<=[.!?。])\s+/);s.forEach(function(x){if(cur&&cc(cur)+cc(x)>CHUNK){out.push(cur);cur='';}cur+=(cur?' ':'')+x;});}else{cur+=(cur?'\n\n':'')+p;}});if(cur)out.push(cur);return out;}
 function tDetect(head){var m=/^LANG:\s*(.+)$/m.exec(head||'');if(m){$('t-det').textContent='감지: '+m[1].trim();var l=m[1].toLowerCase();$('t-det').dataset.l=/korean/.test(l)?'ko':/japan/.test(l)?'ja':/chin/.test(l)?'zh':'en';}}
@@ -362,7 +376,7 @@ function renderHist(){var box=$('h-list'),q=($('h-q').value||'').toLowerCase();b
     var b1=el('button',{type:'button',class:'act'},'펼치기');b1.onclick=function(){d.classList.toggle('open');b1.textContent=d.classList.contains('open')?'접기':'펼치기';};
     var b2=el('button',{type:'button',class:'act'},'결과 복사');b2.onclick=function(){copyText(h.output||'',b2);};
     var b3=el('button',{type:'button',class:'act'},'다시 열기');b3.onclick=function(){if(h.tool==='번역'){tIn.value=h.input;tCount();tOut.textContent=h.output;tOut.classList.remove('empty');tOutCount(h.output);tLast={text:h.input,out:h.output};['t-copy-out','t-again','t-para','t-fix'].forEach(function(i){$(i).disabled=false;});showTab('translate');}
-      else{pIn.value=h.input;pLang=h.lang||'en';pick($('p-lang'),pLang);pMode=h.mode||'fix';pick($('p-mode'),pMode);pUI();pOut.classList.remove('empty');var fr=pMode==='fix'?diffHTML(h.input,h.output):null;pOut.textContent='';if(fr)pOut.appendChild(fr);else pOut.textContent=h.output;renderNotes($('p-notes'),h.notes||'');pLast={text:h.input,out:h.output};['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=false;});showTab('polish');}};
+      else{pIn.value=h.input;pLang=h.lang||'en';pick($('p-lang'),pLang);setPMode(h.mode||'fix');pUI();pOut.classList.remove('empty');var fr=pMode==='fix'?diffHTML(h.input,h.output):null;pOut.textContent='';if(fr)pOut.appendChild(fr);else pOut.textContent=h.output;renderNotes($('p-notes'),h.notes||'');pLast={text:h.input,out:h.output};['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=false;});showTab('polish');}};
     var b4=el('button',{type:'button',class:'act'},'삭제');b4.onclick=function(){if(b4.dataset.c){delHist(h.id);}else{b4.dataset.c='1';b4.textContent='정말?';setTimeout(function(){b4.dataset.c='';b4.textContent='삭제';},2500);}};
     [b1,b2,b3,b4].forEach(function(b){hd.appendChild(b);});d.appendChild(hd);
     d.appendChild(el('div',{class:'q'},h.input||''));d.appendChild(el('div',{class:'a'},h.output||''));box.appendChild(d);});}

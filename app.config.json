@@ -10,7 +10,7 @@
   "db_collections": {
     "history": "실행 기록 {tool, lang, mode, input, output, notes, tier, at}"
   },
-  "app_version": "1.1.1",
+  "app_version": "1.1.2",
   "models": {
     "quick": {
       "model": "claude-haiku-5-5",
