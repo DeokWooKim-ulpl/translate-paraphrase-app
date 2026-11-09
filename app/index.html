@@ -53,6 +53,7 @@ nav button:focus-visible,button:focus-visible{outline:2px solid var(--accent);ou
 .cnt{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);background:var(--mute-soft);border-radius:4px;padding:1px 7px;font-variant-numeric:tabular-nums}
 textarea{font:inherit;font-size:15px;line-height:1.7;color:var(--ink);background:var(--paper);border:0;padding:14px;width:100%;min-height:300px;resize:vertical;outline:none}
 textarea:focus-visible{box-shadow:inset 0 0 0 2px var(--accent-soft)}
+textarea.flash{background:var(--accent-soft);transition:background .3s}
 .out{padding:14px;min-height:300px;white-space:pre-wrap;flex:1;line-height:1.75;font-size:15px}
 .out.empty{display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;font-size:14px}
 .out ins{background:var(--good-soft);color:var(--good);text-decoration:none;border-radius:3px;padding:0 2px}
@@ -181,7 +182,7 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
     </div>
   </section>
 
-  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.1.2</div>
+  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.2.0</div>
 </div>
 
 <script>
@@ -194,7 +195,7 @@ var LS=function(k,v){try{if(v===undefined)return localStorage.getItem(k);localSt
 /* ---------- 지시문 (수정은 여기서) ---------- */
 var LANGNAME={ko:'Korean',en:'English',ja:'Japanese',zh:'Chinese',auto:''};
 var STYLE={
-  standard:'Rewrite in a natural, standard register. Keep the meaning, length and tone roughly the same.',
+  standard:'Rewrite in a natural, standard register. Keep the meaning and roughly the length, but change the wording and sentence structure freely.',
   formal:'Rewrite in a formal, polite register suitable for official documents or professional email.',
   academic:'Rewrite in an academic register suitable for a peer-reviewed physics/optics paper: precise, hedged where appropriate, no colloquialisms, consistent terminology.',
   simple:'Rewrite so that a non-expert can follow: shorter sentences, plain words, no jargon unless defined.',
@@ -216,10 +217,26 @@ function fixRules(lang){
   '2. A line containing only ---\n'+
   '3. Up to 8 bullet lines starting with "- " explaining the important changes in Korean: "원문 → 수정: 이유". If nothing needed changing, write "- 고칠 곳이 없습니다."';
 }
-function paraRules(lang,style){
-  return 'You rewrite '+(lang==='ko'?'Korean':'English')+' text for a physicist (laser/photonics research). '+STYLE[style]+
-  ' Preserve every fact, number, unit, LaTeX expression, citation and the original language. Output only the rewritten text, no preamble, no quotes, no explanation.';
+/* 패러프레이즈: 누를 때마다 다른 고쳐쓰기 전략 하나를 뽑고, 같은 글에 대해 앞서 나온 판들을 함께 보내 '그것들과 다르게' 쓰게 함 */
+var APPROACH=[
+  'Reorder the information: lead with the conclusion or purpose, then give the method or reason.',
+  'Change grammatical voice and subjects: turn passive constructions active and active ones passive where natural.',
+  'Restructure sentence boundaries: split long sentences into short ones, or merge short ones with explicit logical connectors.',
+  'Reword thoroughly: replace the main verbs, nouns and adjectives with different but equally precise wording; vary every sentence opener.',
+  'Convert noun-heavy phrases into verb phrases, or the reverse (nominalization vs. verbal style).',
+  'Shift emphasis: foreground the result or significance instead of the procedure (or the reverse), keeping all facts.',
+  'Rebuild the paragraph around a different topic sentence and move the supporting details accordingly.',
+  'Vary rhythm: alternate long and short sentences and relocate subordinate clauses to new positions.'
+];
+function paraRules(lang,style,approach,prev){
+  return 'You rewrite '+(lang==='ko'?'Korean':'English')+' text for a physicist (laser/photonics research).\nGoal of this pass: '+STYLE[style]+
+  '\nThis must be a genuine paraphrase, not a light edit. Rebuild every sentence: do not keep any sentence verbatim, change the sentence structure and most of the wording, and aim for well under half of the original content words appearing in their original order. Main rewriting strategy for this version: '+approach+
+  (prev&&prev.length?'\nEarlier versions already produced for this same text. Make this one clearly different from ALL of them in structure and wording:\n'+prev.map(function(v,i){return '<v'+(i+1)+'>\n'+v+'\n</v'+(i+1)+'>';}).join('\n'):'')+
+  '\nPreserve every fact, number, unit, LaTeX expression, citation and the original language; add no new facts.'+
+  '\nOutput format, strictly:\n1. The full rewritten text only (no preamble, no quotes).\n2. A line containing only ---\n3. Up to 8 bullet lines starting with "- " in Korean explaining the main changes: "원문 표현 → 새 표현: 왜 그렇게 바꿨는지(문체·구조 관점)".';
 }
+/* 원문 낱말 재사용률: 결과의 내용어 중 원문에도 있는 비율 (낮을수록 많이 바뀜) */
+function overlapPct(a,b){function w(t){return (t.toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(function(x){return x.length>=2;});}var A=new Set(w(a)),B=w(b);if(!B.length)return 0;var n=0;B.forEach(function(x){if(A.has(x))n++;});return Math.round(100*n/B.length);}
 function trRules(src,dst,style){
   return 'Translate the text '+(src==='auto'?'(detect its language) ':'from '+LANGNAME[src]+' ')+'into '+LANGNAME[dst]+'. Domain: physics / laser / photonics research; use standard technical terminology and keep numbers, units, LaTeX, citations, line breaks and list structure. '+
   STYLE[style]+'\nOutput format, strictly: first line "LANG: <detected source language in English>", then a line containing only ---, then the translation only. No other commentary.';
@@ -268,7 +285,7 @@ function diffHTML(a,b){
   while(i2<n)dl+=A[i2++];while(j2<m)ins+=B[j2++];flush();return out;
 }
 function splitNotes(t){var k=t.indexOf('\n---');if(k<0)return [t.trim(),''];return [t.slice(0,k).trim(),t.slice(k+4).trim()];}
-function renderNotes(box,notes){box.innerHTML='';if(!notes){box.classList.add('hidden');return;}box.classList.remove('hidden');var ul=el('ul');notes.split('\n').forEach(function(l){l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(el('div',{class:'label'},'바뀐 곳'));box.appendChild(ul);}
+function renderNotes(box,notes,title){box.innerHTML='';if(!notes&&!title){box.classList.add('hidden');return;}box.classList.remove('hidden');var ul=el('ul');(notes||'').split('\n').forEach(function(l){l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(el('div',{class:'label'},title||'바뀐 곳'));box.appendChild(ul);}
 
 /* ---------- 저장(db / localStorage) ---------- */
 var db=null,hist=[];
@@ -297,7 +314,7 @@ showTab(location.hash.slice(1)||LS('tab')||'polish');
 
 /* ---------- 다듬기 ---------- */
 var pIn=$('p-in'),pOut=$('p-out'),pRun=$('p-run'),pLast={text:'',out:''};
-var pLang='en',pMode='fix',pStyle='standard';
+var pLang='en',pMode='fix',pStyle='standard',pPrev={key:'',list:[]};
 /* 방식: 교정(fix) 또는 패러프레이즈(문체 pStyle). pMode = 'fix' 또는 문체 이름 */
 function setPMode(m){if(m==='fix'){pMode='fix';pick($('p-mode'),'fix');}else{pStyle=m;pMode=m;pick($('p-mode'),'para');pick($('p-style'),m);}}
 function pUI(){var ko=pLang==='ko';
@@ -315,18 +332,22 @@ pIn.addEventListener('input',pCount);pUI();
 $('p-clear').onclick=function(){pIn.value='';pCount();pIn.focus();};
 $('p-copy-in').onclick=function(){copyText(pIn.value,this);};
 $('p-copy-out').onclick=function(){copyText(pLast.out,this);};
-$('p-use').onclick=function(){pIn.value=pLast.out;pCount();pIn.focus();};
+$('p-use').onclick=function(){pIn.value=pLast.out;pCount();setOut(pOut,pMode==='fix'?'교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'패러프레이즈한 글이 여기에 뜹니다.',true);$('p-notes').classList.add('hidden');['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=true;});$('p-msg').className='msg good';$('p-msg').textContent='결과를 왼쪽 입력 칸에 넣었습니다. 이어서 교정하거나 다시 패러프레이즈할 수 있습니다.';pIn.classList.add('flash');setTimeout(function(){pIn.classList.remove('flash');},1200);pIn.focus();};
 $('p-tr').onclick=function(){$('t-in').value=pLast.out;tCount();showTab('translate');};
 async function runPolish(){
   var text=pIn.value.trim();if(!text)return;pRun.disabled=true;$('p-notes').classList.add('hidden');
   ['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=true;});
-  var isFix=pMode==='fix';
-  var prompt=(isFix?fixRules(pLang):paraRules(pLang,pMode))+'\n\nTEXT:\n'+text;
-  var raw=await ask(prompt,pOut,$('p-msg'),$('p-stop'),isFix?function(t){return splitNotes(t)[0]||t;}:null);
+  var isFix=pMode==='fix',approach='';
+  if(!isFix){var key=pLang+'|'+pMode+'|'+text;if(pPrev.key!==key)pPrev={key:key,list:[]};
+    var used=pPrev.list.map(function(v){return v.ai;});var cands=APPROACH.map(function(_,i){return i;}).filter(function(i){return used.indexOf(i)<0;});if(!cands.length)cands=APPROACH.map(function(_,i){return i;});
+    var ai=cands[Math.floor(Math.random()*cands.length)];approach=APPROACH[ai];pPrev.pending=ai;}
+  var prompt=(isFix?fixRules(pLang):paraRules(pLang,pMode,approach,pPrev.list.slice(-3).map(function(v){return v.out;})))+'\n\nTEXT:\n'+text;
+  var raw=await ask(prompt,pOut,$('p-msg'),$('p-stop'),function(t){return splitNotes(t)[0]||t;});
   pRun.disabled=false;if(raw==null){setOut(pOut,'결과를 받지 못했습니다.',true);return;}
-  var out=raw.trim(),notes='';
-  if(isFix){var sp=splitNotes(raw);out=sp[0];notes=sp[1];var frag=diffHTML(text,out);pOut.textContent='';if(frag)pOut.appendChild(frag);else pOut.textContent=out;renderNotes($('p-notes'),notes);}
-  else{pOut.textContent=out;}
+  var sp=splitNotes(raw),out=sp[0],notes=sp[1];
+  if(isFix){var frag=diffHTML(text,out);pOut.textContent='';if(frag)pOut.appendChild(frag);else pOut.textContent=out;renderNotes($('p-notes'),notes);}
+  else{pOut.textContent=out;pPrev.list.push({ai:pPrev.pending,out:out});
+    var pct=overlapPct(text,out);renderNotes($('p-notes'),notes,'바뀐 곳과 이유 · '+pPrev.list.length+'번째 판 · 원문 낱말 재사용 '+pct+'%'+(pct>70?' (적게 바뀜 — "다시"를 누르면 다른 전략으로 씀)':''));}
   pLast={text:text,out:out};['p-copy-out','p-again','p-use','p-tr'].forEach(function(i){$(i).disabled=false;});
   saveHist({tool:isFix?'교정':'패러프레이즈',lang:pLang,mode:pMode,input:text,output:out,notes:notes.slice(0,4000),tier:tier.value});
 }
