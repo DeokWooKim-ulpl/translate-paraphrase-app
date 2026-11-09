@@ -15,7 +15,7 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.75;margin:0;
 padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 64px}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
-.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 h1,h2,h3{font-family:var(--f-head);text-wrap:balance;line-height:1.35;margin:0}
 h1{font-size:22px}h2{font-size:19px}h3{font-size:16px}
 p{margin:6px 0}
@@ -48,6 +48,14 @@ nav button:focus-visible,button:focus-visible{outline:2px solid var(--accent);ou
 .two>div{min-width:0;display:flex;flex-direction:column}
 .two>div+div{border-left:1px solid var(--line)}
 @media (max-width:760px){.two{grid-template-columns:1fr}.two>div+div{border-left:0;border-top:1px solid var(--line)}}
+/* 1행 3열: 입력 | 결과 | 설명(바뀐 곳과 이유·자연스러움 점검). 1000px 아래는 2열+설명 전체 폭, 760px 아래는 1열 */
+.three{grid-template-columns:1fr 1fr minmax(260px,.9fr)}
+@media (max-width:1000px){.three{grid-template-columns:1fr 1fr}.three>div:nth-child(3){grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}}
+@media (max-width:760px){.three{grid-template-columns:1fr}}
+.side{padding:12px 14px;flex:1;overflow-y:auto;max-height:560px;display:flex;flex-direction:column;gap:12px;font-size:13.5px}
+.side.empty{color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;min-height:200px}
+.side .notes{border-top:0;margin:0;padding:0}
+.side .notes+.notes{border-top:1px dashed var(--line);padding-top:12px}
 .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13.5px;min-height:44px}
 .bar.bottom{border-bottom:0;border-top:1px solid var(--line);justify-content:space-between}
 .cnt{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);background:var(--mute-soft);border-radius:4px;padding:1px 7px;font-variant-numeric:tabular-nums}
@@ -122,7 +130,7 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <button type="button" data-v="report" aria-selected="false" data-ko="1">보고서</button>
         <button type="button" data-v="article" aria-selected="false" data-ko="1">기사</button>
       </nav>
-      <div class="two">
+      <div class="two three">
         <div>
           <div class="bar"><span>단어 <span class="cnt" id="p-w">0</span></span><span>글자 <span class="cnt" id="p-c">0</span></span><span class="sp" style="flex:1"></span><span class="msg" id="p-hint"></span></div>
           <textarea id="p-in" placeholder="영어 글을 여기에 적거나 붙여 넣으세요 (같은 언어로 교정·패러프레이즈)" aria-label="다듬을 글"></textarea>
@@ -131,9 +139,11 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <div>
           <div class="bar"><span>결과</span><span class="msg" id="p-msg"></span><span class="sp" style="flex:1"></span><button type="button" class="act" id="p-stop" hidden>멈추기</button></div>
           <div class="out empty" id="p-out">교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.</div>
-          <div class="notes hidden" id="p-notes"></div>
-          <div class="notes hidden" id="p-nat"></div>
-          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시</button><button type="button" class="act" id="p-use" disabled>결과를 입력으로</button><button type="button" class="act" id="p-tr" disabled>번역으로 보내기</button><button type="button" class="act" id="p-nat-btn" disabled title="결과가 원어민 전문가 글처럼 자연스러운지 Claude에게 따로 묻습니다">자연스러움 점검</button></div></div>
+          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시</button><button type="button" class="act" id="p-use" disabled>결과를 입력으로</button><button type="button" class="act" id="p-tr" disabled>번역으로 보내기</button></div></div>
+        </div>
+        <div>
+          <div class="bar"><span>설명</span><span class="sp" style="flex:1"></span><button type="button" class="act" id="p-nat-btn" disabled title="결과가 원어민 전문가 글처럼 자연스러운지 Claude에게 따로 묻습니다">자연스러움 점검</button></div>
+          <div class="side empty" id="p-side"><div id="p-side-empty">실행하면 바뀐 곳과 이유가 여기에, 점검을 누르면 자연스러움 점검 결과가 그 아래에 뜹니다.</div><div class="notes hidden" id="p-notes"></div><div class="notes hidden" id="p-nat"></div></div>
         </div>
       </div>
     </div>
@@ -159,7 +169,7 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <button type="button" data-v="shorter" aria-selected="false">짧게</button>
         <button type="button" data-v="simple" aria-selected="false">쉽게</button>
       </nav>
-      <div class="two">
+      <div class="two three">
         <div>
           <div class="bar"><span>단어 <span class="cnt" id="t-w">0</span></span><span>글자 <span class="cnt" id="t-c">0</span></span></div>
           <textarea id="t-in" placeholder="다른 언어로 번역할 글을 여기에 적거나 붙여 넣으세요" aria-label="번역할 글"></textarea>
@@ -168,8 +178,11 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
         <div>
           <div class="bar"><span>단어 <span class="cnt" id="t-ow">0</span></span><span>글자 <span class="cnt" id="t-oc">0</span></span><span class="msg" id="t-msg"></span><span class="sp" style="flex:1"></span><button type="button" class="act" id="t-stop" hidden>멈추기</button></div>
           <div class="out empty" id="t-out">번역한 글이 여기에 뜹니다.</div>
-          <div class="notes hidden" id="t-nat"></div>
-          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시</button><button type="button" class="act" id="t-para" disabled title="번역 결과가 생기면 그 글을 교정·패러프레이즈 탭으로 보냅니다">패러프레이즈</button><button type="button" class="act" id="t-fix" disabled title="번역 결과가 생기면 그 글을 교정·패러프레이즈 탭으로 보냅니다">교정하기</button><button type="button" class="act" id="t-nat-btn" disabled title="번역이 원어민 글처럼 자연스러운지 Claude에게 따로 묻습니다">자연스러움 점검</button></div></div>
+          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>결과 복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시</button><button type="button" class="act" id="t-para" disabled title="번역 결과가 생기면 그 글을 교정·패러프레이즈 탭으로 보냅니다">패러프레이즈</button><button type="button" class="act" id="t-fix" disabled title="번역 결과가 생기면 그 글을 교정·패러프레이즈 탭으로 보냅니다">교정하기</button></div></div>
+        </div>
+        <div>
+          <div class="bar"><span>설명</span><span class="sp" style="flex:1"></span><button type="button" class="act" id="t-nat-btn" disabled title="번역이 원어민 글처럼 자연스러운지 Claude에게 따로 묻습니다">자연스러움 점검</button></div>
+          <div class="side empty" id="t-side"><div id="t-side-empty">점검을 누르면 자연스러움 점검 결과가 여기에 뜹니다.</div><div class="notes hidden" id="t-nat"></div></div>
         </div>
       </div>
     </div>
@@ -184,7 +197,7 @@ input.txt{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);bord
     </div>
   </section>
 
-  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.3.0</div>
+  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · app 1.4.0</div>
 </div>
 
 <script>
@@ -292,11 +305,12 @@ function diffHTML(a,b){
   while(i2<n)dl+=A[i2++];while(j2<m)ins+=B[j2++];flush();return out;
 }
 function splitNotes(t){var k=t.indexOf('\n---');if(k<0)return [t.trim(),''];return [t.slice(0,k).trim(),t.slice(k+4).trim()];}
-function renderNotes(box,notes,title){box.innerHTML='';if(!notes&&!title){box.classList.add('hidden');return;}box.classList.remove('hidden');var ul=el('ul');(notes||'').split('\n').forEach(function(l){l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(el('div',{class:'label'},title||'바뀐 곳'));box.appendChild(ul);}
+function sideSync(prefix){var side=$(prefix+'-side');if(!side)return;var any=Array.prototype.some.call(side.querySelectorAll('.notes'),function(n){return !n.classList.contains('hidden');});side.classList.toggle('empty',!any);$(prefix+'-side-empty').hidden=any;}
+function renderNotes(box,notes,title){box.innerHTML='';if(!notes&&!title){box.classList.add('hidden');sideSync(box.id.split('-')[0]);return;}box.classList.remove('hidden');var ul=el('ul');(notes||'').split('\n').forEach(function(l){l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(el('div',{class:'label'},title||'바뀐 곳'));box.appendChild(ul);sideSync(box.id.split('-')[0]);}
 
 /* 자연스러움 점검 실행: box 에 점수·문제 목록·고친 글 + [고친 글을 결과로] 버튼 */
 async function runNat(text,lang,box,msgEl,stopBtn,btn,onApply){
-  if(!text)return;btn.disabled=true;box.classList.remove('hidden');box.innerHTML='';box.appendChild(el('div',{class:'label'},'자연스러움 점검'));var live=el('div',{class:'msg'},'읽는 중…');box.appendChild(live);
+  if(!text)return;btn.disabled=true;box.classList.remove('hidden');sideSync(box.id.split('-')[0]);box.innerHTML='';box.appendChild(el('div',{class:'label'},'자연스러움 점검'));var live=el('div',{class:'msg'},'읽는 중…');box.appendChild(live);
   var s=await sampleP;if(!s){live.textContent='이 화면에서는 Claude를 부를 수 없습니다.';btn.disabled=false;return;}
   var ctl=new AbortController();stopBtn.hidden=false;stopBtn.onclick=function(){ctl.abort();};
   var raw=null;try{var mo=modelOpts();var r=await s(natRules(lang)+'\n\nTEXT:\n'+text,{model:mo.model,modelTier:mo.modelTier,effort:mo.effort,cache:false,signal:ctl.signal,onText:function(u){live.textContent=splitNotes(u.text)[0]||u.text;}});raw=r.text;msgEl.className='msg';msgEl.textContent='· 점검: '+appliedLabel(r);}
@@ -306,7 +320,7 @@ async function runNat(text,lang,box,msgEl,stopBtn,btn,onApply){
   var sc=/점수\s*[:：]\s*(\d)/.exec(head);var n=sc?+sc[1]:0;
   var hd=el('div',{class:'row'});hd.appendChild(el('span',{class:'label'},'자연스러움 점검'));if(n)hd.appendChild(el('span',{class:'chip '+(n>=4?'ok':n>=3?'mid':'no')},'점수 '+n+'/5'));box.appendChild(hd);
   var ul=el('ul');head.split('\n').forEach(function(l){if(/^\s*점수/.test(l))return;l=l.replace(/^\s*[-*•]\s*/,'').trim();if(l)ul.appendChild(el('li',null,l));});box.appendChild(ul);
-  if(fixed&&fixed.trim()&&fixed.trim()!==text.trim()){var ab=el('button',{type:'button',class:'act'},'고친 글을 결과로 넣기');ab.onclick=function(){onApply(fixed.trim());box.classList.add('hidden');};box.appendChild(ab);}
+  if(fixed&&fixed.trim()&&fixed.trim()!==text.trim()){var ab=el('button',{type:'button',class:'act'},'고친 글을 결과로 넣기');ab.onclick=function(){onApply(fixed.trim());ab.disabled=true;ab.textContent='결과 칸에 넣었습니다';};box.appendChild(ab);}
 }
 /* ---------- 저장(db / localStorage) ---------- */
 var db=null,hist=[];
@@ -353,11 +367,11 @@ pIn.addEventListener('input',pCount);pUI();
 $('p-clear').onclick=function(){pIn.value='';pCount();pIn.focus();};
 $('p-copy-in').onclick=function(){copyText(pIn.value,this);};
 $('p-copy-out').onclick=function(){copyText(pLast.out,this);};
-$('p-use').onclick=function(){pIn.value=pLast.out;pCount();setOut(pOut,pMode==='fix'?'교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'패러프레이즈한 글이 여기에 뜹니다.',true);$('p-notes').classList.add('hidden');['p-copy-out','p-again','p-use','p-tr','p-nat-btn'].forEach(function(i){$(i).disabled=true;});$('p-nat').classList.add('hidden');$('p-msg').className='msg good';$('p-msg').textContent='결과를 왼쪽 입력 칸에 넣었습니다. 이어서 교정하거나 다시 패러프레이즈할 수 있습니다.';pIn.classList.add('flash');setTimeout(function(){pIn.classList.remove('flash');},1200);pIn.focus();};
+$('p-use').onclick=function(){pIn.value=pLast.out;pCount();setOut(pOut,pMode==='fix'?'교정한 글이 여기에 뜹니다. 바뀐 낱말은 색으로 표시됩니다.':'패러프레이즈한 글이 여기에 뜹니다.',true);$('p-notes').classList.add('hidden');['p-copy-out','p-again','p-use','p-tr','p-nat-btn'].forEach(function(i){$(i).disabled=true;});$('p-nat').classList.add('hidden');$('p-notes').classList.add('hidden');sideSync('p');$('p-msg').className='msg good';$('p-msg').textContent='결과를 왼쪽 입력 칸에 넣었습니다. 이어서 교정하거나 다시 패러프레이즈할 수 있습니다.';pIn.classList.add('flash');setTimeout(function(){pIn.classList.remove('flash');},1200);pIn.focus();};
 $('p-tr').onclick=function(){$('t-in').value=pLast.out;tCount();showTab('translate');};
 async function runPolish(){
   var text=pIn.value.trim();if(!text)return;pRun.disabled=true;$('p-notes').classList.add('hidden');
-  ['p-copy-out','p-again','p-use','p-tr','p-nat-btn'].forEach(function(i){$(i).disabled=true;});$('p-nat').classList.add('hidden');
+  ['p-copy-out','p-again','p-use','p-tr','p-nat-btn'].forEach(function(i){$(i).disabled=true;});$('p-nat').classList.add('hidden');$('p-notes').classList.add('hidden');sideSync('p');
   var isFix=pMode==='fix',approach='';
   if(!isFix){var key=pLang+'|'+pMode+'|'+text;if(pPrev.key!==key)pPrev={key:key,list:[]};
     var used=pPrev.list.map(function(v){return v.ai;});var cands=APPROACH.map(function(_,i){return i;}).filter(function(i){return used.indexOf(i)<0;});if(!cands.length)cands=APPROACH.map(function(_,i){return i;});
@@ -392,7 +406,7 @@ var CHUNK=5000;
 function chunks(t){var out=[],cur='';t.split(/\n{2,}/).forEach(function(p){if(cur&&cc(cur)+cc(p)>CHUNK){out.push(cur);cur='';}if(cc(p)>CHUNK){var s=p.split(/(?<=[.!?。])\s+/);s.forEach(function(x){if(cur&&cc(cur)+cc(x)>CHUNK){out.push(cur);cur='';}cur+=(cur?' ':'')+x;});}else{cur+=(cur?'\n\n':'')+p;}});if(cur)out.push(cur);return out;}
 function tDetect(head){var m=/^LANG:\s*(.+)$/m.exec(head||'');if(m){$('t-det').textContent='감지: '+m[1].trim();var l=m[1].toLowerCase();$('t-det').dataset.l=/korean/.test(l)?'ko':/japan/.test(l)?'ja':/chin/.test(l)?'zh':'en';}}
 async function runTr(){
-  var text=tIn.value.trim();if(!text)return;tRun.disabled=true;['t-copy-out','t-again','t-para','t-fix','t-nat-btn'].forEach(function(i){$(i).disabled=true;});$('t-nat').classList.add('hidden');
+  var text=tIn.value.trim();if(!text)return;tRun.disabled=true;['t-copy-out','t-again','t-para','t-fix','t-nat-btn'].forEach(function(i){$(i).disabled=true;});$('t-nat').classList.add('hidden');sideSync('t');
   var src=$('t-src').value,dst=$('t-dst').value,rules=trRules(src,dst,tStyle),out='';
   var parts=cc(text)>CHUNK*1.2?chunks(text):[text];
   for(var i=0;i<parts.length;i++){

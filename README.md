@@ -1,7 +1,7 @@
 # translate-paraphrase-app — 번역 및 패러프레이징 앱
 
 영어·한국어 글을 **교정**하고, 문체에 맞춰 **패러프레이즈**하고, 언어 간 **번역**하는 claude.ai 아티팩트.
-화면 틀·색·글꼴·탭 구조는 [artifact-board](https://github.com/DeokWooKim-ulpl/personal-skill-managements/tree/main/skills/artifact-board) 엔진(`board.css`)과 같음. 파일은 `app/index.html` 하나이고 생성 단계(파이썬)는 없음.
+화면은 입력 · 결과 · 설명(바뀐 곳과 이유, 자연스러움 점검)의 1행 3열(폭 1000px 아래 2열, 760px 아래 1열). 색·글꼴·탭 구조는 [artifact-board](https://github.com/DeokWooKim-ulpl/personal-skill-managements/tree/main/skills/artifact-board) 엔진(`board.css`)과 같음. 파일은 `app/index.html` 하나이고 생성 단계(파이썬)는 없음.
 
 - 게시 주소: https://claude.ai/artifact/KgQrKRabv1a17keoh9Uaop (비공개, 설정은 `app.config.json`)
 - 변경 내역: `CHANGELOG.md`
@@ -24,6 +24,10 @@
 - `effort`는 답하기 전에 모델이 얼마나 생각하는지(low·medium·high). 생각을 못 하는 모델이면 무시됨.
 - 그 모델을 계정에서 못 쓰거나 과부하면 claude.ai가 같은 등급(`modelTier`)의 모델로 대신 답하고, 화면에 "(대신 답함)"으로 표시됨.
 - 선택은 브라우저에 기억됨. 호출은 보는 사람의 claude.ai 사용량으로 나감(첫 사용 때 동의 창).
+
+## 자연스러움 점검의 기준
+
+외부 규칙이나 말뭉치 점수가 아니라 **Claude가 "엄격한 원어민 편집자" 역할로 읽고 내리는 판단**임. 지시문(`natRules`)이 보라고 하는 것: 관용적이지 않은 연어(collocation), 어색한 어순, 번역투, 딱딱하거나 지나치게 격식적인 구문, 지시 대상이 불분명한 표현, 부자연스러운 리듬. 과학적 내용의 옳고 그름은 보지 않음. 점수(1~5)는 모델의 주관적 등급이므로 측정값이 아니라 **다시 볼 곳을 짚어 주는 표시**로 쓸 것. 같은 글도 모델·호출마다 점수가 달라질 수 있음. "고친 글을 결과로 넣기"는 **결과 칸**(패러프레이즈·번역 결과)을 바꾸고 입력 칸은 건드리지 않음.
 
 ## 저장
 
