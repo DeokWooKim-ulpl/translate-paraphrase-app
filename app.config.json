@@ -4,13 +4,12 @@
   "artifact_url": "https://claude.ai/artifact/KgQrKRabv1a17keoh9Uaop",
   "file_path": "app/index.html",
   "capabilities": {
+    "sample": {},
     "db": {},
-    "sample": {}
+    "user": {},
+    "downloads": true
   },
-  "db_collections": {
-    "history": "실행 기록 {tool, lang, mode, input, output, notes, tier, at}"
-  },
-  "app_version": "1.4.0",
+  "app_version": "2.0.0",
   "models": {
     "quick": {
       "model": "claude-haiku-5-5",
@@ -22,5 +21,10 @@
       "modelTier": "default",
       "effort": "medium"
     }
+  },
+  "build": "python3 build.py",
+  "db_paths": {
+    "data/users/<uid>/app/history/<id>": "실행 기록 {kind, lang, src, dst, style, level, note, input, output, notes, versions, sel, tier, at, edited}",
+    "data/users/<uid>/prefs": "용어집·지침 {terms, rules, at}"
   }
 }
