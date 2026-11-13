@@ -5,7 +5,15 @@
   "file_path": "app/index.html",
   "capabilities": {
     "sample": {},
-    "db": {},
+    "db": {
+      "rules": [
+        {
+          "path": "history",
+          "read": "owner",
+          "write": "owner"
+        }
+      ]
+    },
     "user": {},
     "downloads": true
   },
@@ -26,5 +34,6 @@
   "db_paths": {
     "data/users/<uid>/app/history/<id>": "실행 기록 {kind, lang, src, dst, style, level, note, input, output, notes, versions, sel, tier, at, edited}",
     "data/users/<uid>/prefs": "용어집·지침 {terms, rules, at}"
-  }
+  },
+  "published_version": 8
 }

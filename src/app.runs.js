@@ -21,6 +21,7 @@ function failText(res) {
    아무것도 없으면 이전 결과를 그대로 둠 */
 function failRun(tab, prev, res, partialText, base, tail) {
   var msg = failText(res), stopped = !res.ok && res.code === 'cancelled';
+  tab.noCache = !!res.ok;                     /* 받은 답이 잘렸거나 형식이 어긋남: 같은 답이 5분간 캐시에서 다시 나오므로 다음 실행은 새로 받음 */
   if (partialText && (!prev || base.keepPartial)) {
     tab.res = Object.assign({}, base, { versions: [{ label: '미완성', out: partialText, notes: '' }], cur: 0, ops: null, part: true, histId: null });
     delete tab.res.keepPartial;
@@ -91,6 +92,7 @@ async function runPolish(fresh) {
   if (!isFix && cc(text) > 8000) { setStatus(P, '패러프레이즈는 한 번에 8,000자까지 됩니다. 문단 단위로 나눠 넣으세요.', 'err'); return; }
   var my = begin(P, 'run');
   if (!my) return;
+  var noCache = fresh ? true : (P.noCache ? 'refresh' : false); P.noCache = false;
   flushSave(P);
   var mo = modelOpts(), tierKey = tier.value, prev = P.res;
   startBusy(P);
@@ -100,12 +102,12 @@ async function runPolish(fresh) {
   if (isFix) {
     var ex = extras('fix', x), rules = withExtras(fixRules(lang, level), ex);
     var parts = cc(text) > CHUNK * 1.2 ? chunkText(text, CHUNK) : [{ text: text, sep: '' }], N = parts.length;
-    var out = '', notes = [], model = null;
+    var out = '', notes = [], model = null, ops = [];
     for (var i = 0; i < N; i++) {
       if (N > 1) setStatus(P, (i + 1) + ' / ' + N + ' 조각 교정 중', '');
       var done = i ? out + parts[i - 1].sep : '';
       var res = await ask(P, build(rules, ex.blocks.concat([block('text', parts[i].text)]), FORMAT_RN),
-        { gen: my, mo: mo, fresh: fresh, onText: (function (d) { return function (raw) { live(P, d + liveText(raw)); }; })(done) });
+        { gen: my, mo: mo, fresh: noCache, onText: (function (d) { return function (raw) { live(P, d + liveText(raw)); }; })(done) });
       if (my !== P.job.gen) return;
       var a = res.text ? readAnswer(res.text) : null;
       if (!(res.ok && !res.truncated && a && a.text && (a.complete || !a.tagged))) {
@@ -115,9 +117,11 @@ async function runPolish(fresh) {
         return;
       }
       out = done + a.text; if (a.notes) notes.push(a.notes); model = res.model;
+      var part = ops && diffChanges(parts[i].text, a.text);          /* 조각마다 비교: 글이 길어도 바뀐 곳 표시를 잃지 않음 */
+      ops = part ? ops.concat(i ? [{ s: parts[i - 1].sep }] : [], part) : null;
     }
     end(P);
-    P.res = Object.assign(base, { versions: [{ label: '교정', out: out, notes: mergeNotes(notes) }], cur: 0, ops: diffChanges(text, out), part: false, histId: null, model: model });
+    P.res = Object.assign(base, { versions: [{ label: '교정', out: out, notes: mergeNotes(notes) }], cur: 0, ops: ops, part: false, histId: null, model: model });
     var nchg = P.res.ops ? P.res.ops.filter(realChange).length : -1;
     doneRun(P, (out === text ? '고칠 곳을 찾지 못했습니다' : '교정 완료' + (nchg >= 0 ? ' · 수정 ' + nchg + '곳' : '')) + (N > 1 ? ' · ' + N + ' 조각' : '') +
       (P.res.ops ? '' : ' · 글이 길어 바뀐 곳 색 표시는 생략했습니다'));
@@ -130,7 +134,8 @@ async function runPolish(fresh) {
   var key = pKey(lang, style, note, around, text);
   if (P.earlier.key !== key) P.earlier = { key: key, list: [] };
   var same = !!prev && prev.kind === 'para' && prev.key === key && !prev.part;
-  var earlier = P.earlier.list.slice(-3);
+  var earlier = [], room = 12000;
+  (same ? prev.versions : []).slice().reverse().forEach(function (v) { if (room >= cc(v.out)) { room -= cc(v.out); earlier.unshift(v.out); } else room = -1; });
   var exP = extras('para', x);
   var blocks = exP.blocks.concat([
     earlier.length ? block('earlier_versions', earlier.map(function (v) { return '<earlier>\n' + v + '\n</earlier>'; }).join('\n')) : '',
@@ -155,7 +160,7 @@ async function runPolish(fresh) {
     failRun(P, prev, resP, half ? half.text.trim() : '', base, '');
     return;
   }
-  var round = same ? (prev.round || 1) + 1 : 1;
+  var round = same ? prev.versions.reduce(function (m, v) { return Math.max(m, +(/ (\d+)$/.exec(v.label) || [0, 1])[1]); }, prev.round || 1) + 1 : 1;
   var newVs = vs.map(function (v) { return { label: VERLABEL[v.n - 1] + (round > 1 ? ' ' + round : ''), out: v.text.trim(), notes: v.why }; });
   if (same) {
     P.res = prev;
@@ -205,10 +210,12 @@ async function runTr(fresh) {
   var note = noteVal('t');
   var my = begin(T, 'run');
   if (!my) return;
+  var noCache = fresh ? true : (T.noCache ? 'refresh' : false); T.noCache = false;
   flushSave(T);
   var mo = modelOpts(), tierKey = tier.value, prev = T.res;
   var parts = cc(text) > CHUNK * 1.2 ? chunkText(text, CHUNK) : [{ text: text, sep: '' }], N = parts.length;
-  var key = [src, dst, style, tierKey, note, text].join('\u0001');
+  var gl = glossFor(glossItems, text), pf = rulesFor(prefs.rules, dst);
+  var key = [src, dst, style, tierKey, note, text, JSON.stringify(gl), pf.join('\n')].join('\u0001');
   if (fresh || T.keep.key !== key || T.keep.outs.length >= N) T.keep = { key: key, outs: [], notes: [] };   /* 멈춘 조각부터 이어서 할 수 있게 끝난 조각을 기억 */
   startBusy(T);
   var base = { kind: 'tr', text: text, lang: dst, src: src, dst: dst, style: style, level: '', note: note, tier: tierKey, at: new Date().toISOString() };
@@ -220,7 +227,7 @@ async function runTr(fresh) {
     var done = i ? out + joinSep(parts[i - 1].sep, dst) : '';
     var prevBlock = i ? block('previous', 'Source just before this passage:\n' + parts[i - 1].text.slice(-400) + '\n\nIts translation, already delivered:\n' + T.keep.outs[i - 1].slice(-600)) : '';
     var res = await ask(T, build(withExtras(trRules(src, dst, style, i > 0), ex), ex.blocks.concat([prevBlock, block('text', parts[i].text)]), FORMAT_RN),
-      { gen: my, mo: mo, fresh: fresh, onText: (function (d) { return function (raw) { live(T, d + liveText(raw)); }; })(done) });
+      { gen: my, mo: mo, fresh: noCache, onText: (function (d) { return function (raw) { live(T, d + liveText(raw)); }; })(done) });
     if (my !== T.job.gen) return;
     var a = res.text ? readAnswer(res.text) : null;
     if (!(res.ok && !res.truncated && a && a.text && (a.complete || !a.tagged))) {
@@ -247,31 +254,37 @@ function clearTab(tab) {
   tab.res = null; tab.review = null; tab.alt = null; tab.back = null; tab.sel = null; tab.undo = false;
   if (tab.k === 't') T.keep = { key: '', outs: [], notes: [] };
 }
-function arrive(tab, name, msg) {
-  refresh(tab); setSide(tab, 'notes'); setStatus(tab, msg, '');
+function arrive(tab, name, msg, old) {
+  refresh(tab); setSide(tab, 'notes');
+  var lost = old && old.trim() && old !== tab.in.value;
+  setStatus(tab, msg, '', lost ? [{ label: '되돌리기', fn: function () { setIn(tab.in, old); setStatus(tab, '', ''); } }] : []);
+  tab.undo = !!lost;
   showTab(name, true);
   window.scrollTo(0, 0);
   try { tab.in.focus({ preventScroll: true }); } catch (e) { tab.in.focus(); }
   flash(tab.in);
 }
 function toPolish(text, mode, lang, style) {
+  var old = P.in.value;
   clearTab(P);
+  showTab('polish', true);                   /* 칸이 보여야 execCommand 가 먹어 Ctrl+Z 로도 되돌릴 수 있음 */
   if (P.langSel !== 'auto' && P.langSel !== lang) { P.langSel = 'auto'; pick($('p-lang'), 'auto'); }
   P.mode = mode; pick($('p-mode'), mode);
   if (mode === 'para' && style && $('p-style').querySelector('button[data-v="' + style + '"]:not([data-ko])')) { P.style = style; pick($('p-style'), style); }
   setIn(P.in, text);
-  arrive(P, 'polish', '번역 결과를 가져왔습니다. 「' + (mode === 'fix' ? '교정하기' : '패러프레이즈하기') + '」를 누르세요.');
+  arrive(P, 'polish', '번역 결과를 가져왔습니다. 「' + (mode === 'fix' ? '교정하기' : '패러프레이즈하기') + '」를 누르세요.', old);
   saveSettings();
 }
 function toTranslate() {
   var r = P.res;
   if (!r || r.part || P.job.busy) return;
-  var out = curOut(P), l = r.lang;
+  var out = curOut(P), l = r.lang, old = T.in.value;
   clearTab(T);
+  showTab('translate', true);
   $('t-src').value = l;
   if ($('t-dst').value === l) $('t-dst').value = l === 'en' ? 'ko' : 'en';
   setIn(T.in, out);
-  arrive(T, 'translate', '교정·패러프레이즈 결과를 가져왔습니다. 「번역하기」를 누르세요.');
+  arrive(T, 'translate', '교정·패러프레이즈 결과를 가져왔습니다. 「번역하기」를 누르세요.', old);
   saveSettings();
 }
 /* 결과를 입력 칸으로 (이어서 다듬기). 되돌리기 가능 */
@@ -305,7 +318,7 @@ function swapLangs() {
   var sl = $('t-src'), d = $('t-dst'), cur = T.in.value.trim(), r = T.res;
   var same = !!r && !r.part && cur === r.text;
   var sv = sl.value !== 'auto' ? sl.value : (same ? r.src : guessLang(cur));
-  var dv = d.value;
+  var dv = same ? r.dst : d.value;
   if (sv === dv) sv = dv === 'ko' ? 'en' : 'ko';
   var moved = same ? curOut(T) : null;
   clearTab(T);

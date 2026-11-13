@@ -34,6 +34,9 @@ eq('cap words en', P.wordCap('max 200 words'), { n: 200, unit: 'w' });
 eq('cap chars', P.wordCap('2000자 이내'), { n: 2000, unit: 'c' });
 eq('cap none', P.wordCap('Optics Letters 초록'), null);
 eq('cap not 자리', P.wordCap('소수 10자리까지'), null);
+eq('cap thousands comma chars', P.wordCap('1,500자 이내'), { n: 1500, unit: 'c' });
+eq('cap thousands comma words', P.wordCap('1,000 words'), { n: 1000, unit: 'w' });
+eq('cap single digit ignored', P.wordCap('3 words'), null);
 
 // extras
 let ex = P.extras('para', { note: '150단어 이내', around: 'ctx', gloss: [{ k: 'pair', a: '공진기', b: 'cavity' }], prefs: ['Use American spelling.'] });
@@ -42,7 +45,8 @@ ok('extras cap rule', ex.rules.some(r => /must not exceed 150 words/.test(r)));
 ex = P.extras('fix', { note: '150단어 이내', around: '', gloss: [], prefs: ['x'] });
 ok('extras fix no cap, minimal edits', !ex.rules.some(r => /must not exceed/.test(r)) && ex.rules.some(r => /minimal edits/.test(r)));
 ex = P.extras('review', { note: 'n', around: 'a', gloss: [{ k: 'keep', a: 'Yb:KGW' }], prefs: ['x'] });
-eq('extras review only glossary', ex.blocks.length, 1);
+eq('extras review gets note, glossary, preferences (no surrounding)', ex.blocks.map(b => /^<(\w+)>/.exec(b)[1]), ['author_note', 'glossary', 'preferences']);
+ok('extras review: note is context, no hard limit', ex.rules.some(r => /do not report it/.test(r)) && !ex.rules.some(r => /must not exceed/.test(r)));
 ex = P.extras('tr', { note: '', around: 'a', gloss: [], prefs: [] });
 eq('extras tr ignores around', ex.blocks.length, 0);
 eq('withExtras none', P.withExtras('B', { rules: [], blocks: [] }), 'B');
@@ -114,6 +118,7 @@ eq('note empty', P.parseNote('  '), null);
 // mergeNotes
 eq('merge drops none-lines', P.mergeNotes(['- 고칠 곳이 없습니다.', '- [관사] "a" → "the": x']), '- [관사] "a" → "the": x');
 eq('merge all none', P.mergeNotes(['- 특기 사항 없음', '- 특기 사항 없음']), '- 특기 사항 없음');
+eq('merge drops duplicate lines', P.mergeNotes(['- [용어] "a" → "b": x', '- [용어] "a" → "b": x\n- [해석] "c": y']), '- [용어] "a" → "b": x\n- [해석] "c": y');
 
 // looksWrapped / unwrap
 const pdf = 'We demonstrate a mode-locked fiber laser with a pulse dura-\ntion of 120 fs and a repetition rate of 80 MHz, which is stabi-\nlized by a piezo actuator. The measured linewidth of the comb\nlines is below 1 kHz over the full spectrum of the laser output\nand remains stable for hours.';

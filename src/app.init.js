@@ -87,7 +87,8 @@ $('p-unwrap').onclick = function () { setIn(P.in, unwrap(P.in.value)); setStatus
 sub($('p-vers'), function (v) {
   var r = P.res;
   if (!r || P.job.busy) { renderVers(P); return; }
-  r.cur = +v; P.review = null; P.alt = null; P.sel = null;
+  r.cur = +v; P.review = r.versions[r.cur].review || null; P.alt = null; P.sel = null;
+  if (!P.review && P.side === 'review') setSide(P, 'notes');
   refresh(P); queueSave(P);
 });
 sub($('p-view'), function (v) {

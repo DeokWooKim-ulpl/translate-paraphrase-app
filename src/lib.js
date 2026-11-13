@@ -71,8 +71,9 @@ function parseTagged(text, tags) {
    diffChanges: 화면·되돌리기용 목록 [{s:'같은 글'} | {a:'지운 글', b:'넣은 글'}].
      - 모든 조각의 (s 또는 b)를 이으면 새 글, (s 또는 a)를 이으면 원문이 정확히 나옴. */
 function diffTokens(s) { return (s || '').match(/\s+|[^\s]+/g) || []; }
-function diffRaw(a, b, capCells) {
-  var A = diffTokens(a), B = diffTokens(b), cap = capCells || 1.6e7;
+function diffRaw(a, b, capCells) { return diffSeq(diffTokens(a), diffTokens(b), capCells); }
+function diffSeq(A, B, capCells) {
+  var cap = capCells || 1.6e7;
   var ops = [];
   function push(t, s) {
     if (!s) return;
@@ -109,12 +110,34 @@ function diffRawLong(a, b, capCells) {
   var whole = diffRaw(a, b, capCells);
   if (whole) return whole;
   var pa = (a || '').split(/(\n{2,})/), pb = (b || '').split(/(\n{2,})/);
-  if (pa.length !== pb.length) return null;
+  if (pa.length !== pb.length) return diffBySentence(a, b, capCells);
   var out = [];
   for (var i = 0; i < pa.length; i++) {
     var part = diffRaw(pa[i], pb[i], capCells);
-    if (!part) return null;
+    if (!part) return diffBySentence(a, b, capCells);
     out = out.concat(part);
+  }
+  return out;
+}
+/* 문단으로도 못 나누는 긴 글: 문장끼리 먼저 맞추고, 달라진 문장 묶음 안에서만 단어를 비교 */
+function sentTokens(s) { return ((s || '').match(/[\s\S]*?(?:[.!?。！？]+["')\]]*\s+|\n+|$)/g) || []).filter(Boolean); }
+function diffBySentence(a, b, capCells) {
+  var coarse = diffSeq(sentTokens(a), sentTokens(b), capCells);
+  if (!coarse) return null;
+  var out = [], i = 0;
+  function push(t, s) { if (!s) return; var last = out[out.length - 1]; if (last && last.t === t) last.s += s; else out.push({ t: t, s: s }); }
+  while (i < coarse.length) {
+    if (coarse[i].t === 'eq') { push('eq', coarse[i].s); i++; continue; }
+    var d = '', n = '';
+    while (i < coarse.length && coarse[i].t !== 'eq') { if (coarse[i].t === 'del') d += coarse[i].s; else n += coarse[i].s; i++; }
+    var fine = diffRaw(d, n, capCells);
+    if (!fine) {                                   /* 달라진 묶음도 너무 길면: 문장 수가 같을 때 문장끼리 짝지음 */
+      var D = sentTokens(d), N = sentTokens(n);
+      if (D.length !== N.length) return null;
+      fine = [];
+      for (var k = 0; k < D.length; k++) { var f = diffRaw(D[k], N[k], capCells); if (!f) return null; fine = fine.concat(f); }
+    }
+    fine.forEach(function (o) { push(o.t, o.s); });
   }
   return out;
 }

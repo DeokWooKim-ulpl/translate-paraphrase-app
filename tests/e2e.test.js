@@ -397,6 +397,85 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     await ctx.close();
   }
 
+  /* ---------- 14. 검증에서 찾은 문제의 회귀 테스트 ---------- */
+  {
+    const { p, errs, ctx } = await open(browser, { cfg: { delay: 40, steps: 8 } });
+    await p.fill('#p-in', EN);
+    await p.click('#p-run'); await settle(p);
+    /* 다시 실행하는 동안: 복사는 옛 결과를 집지 않게 꺼짐, 보기 칩을 눌러도 흐르는 글이 유지됨 */
+    await p.click('#p-again'); await wait(p, 100);
+    ok('14 copy disabled while running', await p.$eval('#p-copy-out', b => b.disabled));
+    await p.click('#p-view [data-v="clean"]');
+    ok('14 view chip does not repaint the old result mid-run', await p.$eval('#p-out', o => o.classList.contains('busy')));
+    await settle(p);
+    await p.click('#p-view [data-v="marks"]');
+    /* 점검 창 안의 멈추기: 글이 흐르는 중에도 눌림 */
+    await p.click('#p-sidetab [data-v="review"]');
+    await p.waitForSelector('#p-pane-review .hd button', { timeout: 3000 });
+    const box = await (await p.$('#p-pane-review .hd button')).boundingBox();
+    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await p.mouse.down(); await p.waitForTimeout(90); await p.mouse.up();
+    await settle(p);
+    eq('14 pane stop button cancels the review', (await calls(p)).pop().state, 'cancelled');
+    ok('14 review tab stays reachable', await p.$eval('#p-sidetab [data-v="review"]', b => !b.disabled));
+    /* 다시 점검은 새 답을 받음 */
+    await p.evaluate(() => { window.__cfg.delay = 0; });
+    await p.click('#p-pane-review >> text=다시 점검'); await settle(p);
+    eq('14 redo review is fresh', (await calls(p)).pop().cache, false);
+    /* 되돌린 수정은 점검 수정을 적용해도 남음 */
+    await p.click('#p-out .chg >> nth=1'); await wait(p);
+    await p.click('#p-pane-review >> text=다시 점검'); await settle(p);
+    await p.click('#p-pane-review .note >> nth=0 >> button'); await wait(p);
+    ok('14 rejected change survives a review fix', /1곳 되돌림/.test(await T(p, '#p-pane-notes .hd')) && (await p.$$eval('#p-out .chg.rej', xs => xs.length)) === 1, await T(p, '#p-pane-notes .hd'));
+    eq('14 focus stays on the applied button', await p.evaluate(() => document.activeElement.textContent), '적용됨');
+    ok('14 no page errors', errs.length === 0, errs);
+    await ctx.close();
+  }
+  {
+    const { p, errs, ctx } = await open(browser);
+    /* 긴 교정: 조각마다 비교해 표시를 잃지 않음 (빈 줄 없는 6,800자) */
+    await p.fill('#p-in', 'The laser was lock to the cavity. '.repeat(200).trim());
+    await p.click('#p-run'); await settle(p);
+    ok('14 long proofread keeps marks', /교정 완료 · 수정 200곳 · 2 조각/.test(await T(p, '#p-status')) && (await p.$$eval('#p-out .chg', xs => xs.length)) === 200, await T(p, '#p-status'));
+    eq('14 duplicate note lines merged', await p.$$eval('#p-pane-notes .note', xs => xs.length), 2);
+    /* 긴 글 점검: 문단 묶음으로 나눠 부름 */
+    const para = 'The laser was lock to the cavity using PDH technique. '.repeat(36).trim();
+    await p.fill('#p-in', [para, para, para, para].join('\n\n'));
+    await p.click('#p-run'); await settle(p);
+    const before = (await calls(p)).length;
+    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    ok('14 long review runs in batches', (await calls(p)).length - before >= 2 && (await p.$$eval('#p-pane-review .note', xs => xs.length)) >= 2, (await calls(p)).length - before);
+    /* 맥락·지시의 쉼표 든 숫자 */
+    await p.click('#p-mode [data-v="para"]'); await p.fill('#p-in', EN); await p.fill('#p-note', '1,500자 이내');
+    await p.click('#p-run'); await settle(p);
+    ok('14 comma number in the limit', /must not exceed 1500 characters/.test(await p.evaluate(() => window.__calls[window.__calls.length - 1].input)) && /\/ 1,500 자/.test(await T(p, '#p-chips')), await T(p, '#p-chips'));
+    await p.fill('#p-note', '이메일');
+    ok('14 changed note marks the result stale', /입력·설정이 바뀜/.test(await T(p, '#p-chips')));
+    await p.fill('#p-note', '1,500자 이내');
+    /* 안마다 점검을 기억 */
+    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await p.click('#p-vers [data-v="1"]'); await wait(p);
+    ok('14 other version: review pane offers a run button', (await p.$$eval('#p-pane-review button.main', xs => xs.length)) === 1 || await p.$eval('#p-pane-review', n => n.hidden));
+    await p.click('#p-vers [data-v="0"]'); await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    ok('14 back to first version: its review is still there', (await p.$$eval('#p-pane-review .note', xs => xs.length)) === 2);
+    /* 다른 표현: 먼저 고르고 나서 탭을 열어도 보임, 키보드용 문장 고르기 */
+    await p.click('#p-sidetab [data-v="notes"]');
+    await p.evaluate(() => { const n = document.getElementById('p-out').firstChild, i = n.textContent.indexOf('the laser showed'); const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 16); const g = getSelection(); g.removeAllRanges(); g.addRange(r); });
+    await wait(p, 80);
+    await p.click('#p-sidetab [data-v="alt"]');
+    eq('14 selection made before opening the tab is shown', await T(p, '#p-pane-alt .quote'), 'the laser showed');
+    await p.click('#p-pane-alt button.main'); await settle(p);
+    await p.click('#p-pane-alt button.main'); await settle(p);
+    ok('14 "three more" tells the model what was offered', /<already_offered>\n- ALT-ONE/.test(await p.evaluate(() => window.__calls[window.__calls.length - 1].input)));
+    await p.evaluate(() => { window.__respond2 = window.__respond; });
+    /* 탭 사이로 보낼 때 받는 쪽 초안을 되돌릴 수 있음 */
+    await p.click('#tabbtn-translate'); await p.fill('#t-in', '아직 실행하지 않은 초안');
+    await p.click('#tabbtn-polish'); await p.click('#p-send'); await wait(p);
+    await p.click('#t-status-acts button'); await wait(p);
+    eq('14 undo restores the draft that was replaced', await p.$eval('#t-in', t => t.value), '아직 실행하지 않은 초안');
+    ok('14 no page errors', errs.length === 0, errs);
+    await ctx.close();
+  }
+
   /* ---------- 13. 좁은 화면·어두운 테마: 가로 스크롤 없음 ---------- */
   for (const [name, w, dark] of [['phone-dark', 400, true], ['tablet', 900, false], ['desk', 1320, false]]) {
     const { p, errs, ctx } = await open(browser, { w, h: 800, dark });

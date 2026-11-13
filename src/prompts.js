@@ -171,7 +171,7 @@ function reviewRules(kind, lang, regText) {
 var FORMAT_REVIEW = 'Reply with issue blocks only, most severe first, at most 10, nothing before or between them:\n' +
   '<issue>\n<kind>one of 누락, 추가, 수치, 의미, 용어, 어색, 문법, 문체</kind>\n<severity>high, medium or low</severity>\n' +
   '<quote>words copied character for character from <result> (never from <source>), on one line, 3 to 15 words, long enough to occur only once there</quote>\n' +
-  '<fix>the text that should replace the quote; for an omission, quote the place where the content belongs and give it back with the missing content inserted</fix>\n' +
+  '<fix>the text that should replace the quote; for an omission, quote the place where the content belongs and give it back with the missing content inserted. Never leave it empty: to delete words, quote them together with a neighbouring word and give back the neighbour alone</fix>\n' +
   '<why>one short Korean sentence; for a fidelity issue cite the source wording</why>\n</issue>\n' +
   'After the last issue write one line: <summary>한국어 한 문장 총평</summary>\n' +
   'If there is nothing to report, write only the <summary> line.';
@@ -198,21 +198,24 @@ var FORMAT_BACK = 'Reply with only:\n<result>\n(the Korean back-translation)\n</
    kind: 'fix' | 'para' | 'tr' | 'review' | 'alt'.  x: {note, around, gloss:[용어 항목], prefs:[지침 줄]}
    돌려주는 값: {rules: 규칙에 덧붙일 줄, blocks: 글 블록 앞에 놓을 블록} */
 function wordCap(note) {
-  var m = /(\d{2,4})\s*(?:단어|낱말|words?)/i.exec(note || '');
-  if (m) return { n: +m[1], unit: 'w' };
-  m = /(\d{2,5})\s*(?:글자|자|characters?|chars?)(?![가-힣A-Za-z])/i.exec(note || '');
-  if (m) return { n: +m[1], unit: 'c' };
+  var N = '(?:^|[^\\d,.])(\\d{1,3}(?:,\\d{3})+|\\d{2,5})', num = function (s) { return +s.replace(/,/g, ''); };
+  var m = new RegExp(N + '\\s*(?:단어|낱말|words?)', 'i').exec(note || '');
+  if (m && num(m[1]) >= 10) return { n: num(m[1]), unit: 'w' };
+  m = new RegExp(N + '\\s*(?:글자|자|characters?|chars?)(?![가-힣A-Za-z])', 'i').exec(note || '');
+  if (m && num(m[1]) >= 10) return { n: num(m[1]), unit: 'c' };
   return null;
 }
 function extras(kind, x) {
   var rules = [], blocks = [];
-  if (x.note && kind !== 'review' && kind !== 'alt') {
+  if (x.note && kind !== 'alt') {
     blocks.push(block('author_note', x.note));
-    rules.push(kind === 'fix'
+    rules.push(kind === 'review'
+      ? "<author_note> is what the author told the writer of <result>: what the text is for, and possibly a length limit, a format or an instruction. Whatever <result> does because of that note (shortening to the limit, the requested layout, dropping what the format excludes) is intended: do not report it, and propose no fix that would break the note."
+      : kind === 'fix'
       ? "The author's note in <author_note> says what this text is for and may add an instruction for this run. Use it to pick the right conventions; apply any instruction only through minimal edits, and do not add, remove or reorder content because of it."
       : "The author's note in <author_note> says what this text is for, who will read it, and may add instructions for this run. Use it to choose conventions, tone and length, and follow its instructions; if one conflicts with keeping the exact meaning, keep the meaning and say so in the notes.");
     var cap = wordCap(x.note);
-    if (cap && kind !== 'fix') rules.push('Hard limit: the result must not exceed ' + cap.n + (cap.unit === 'w' ? ' words.' : ' characters.'));
+    if (cap && kind !== 'fix' && kind !== 'review') rules.push('Hard limit: the result must not exceed ' + cap.n + (cap.unit === 'w' ? ' words.' : ' characters.'));
   }
   if (x.around && kind !== 'review' && kind !== 'tr') {
     blocks.push(block('surrounding', x.around));
@@ -224,9 +227,13 @@ function extras(kind, x) {
       ? "The author's own terminology is in <glossary>. A term that follows it is correct by definition: never report it; report a departure from it as 용어."
       : "The author's own terminology is in <glossary>. It is binding and overrides your default word choice; never \"correct\" these terms.");
   }
-  if (x.prefs && x.prefs.length && kind !== 'review') {
+  if (x.prefs && x.prefs.length) {
     blocks.push(block('preferences', x.prefs.map(function (l) { return '- ' + l; }).join('\n')));
-    rules.push(kind === 'fix'
+    rules.push(kind === 'review'
+      ? "The author's standing preferences are in <preferences>. Text that follows them is correct by definition: never report it, and make every <fix> comply with them."
+      : kind === 'alt'
+      ? "The author's standing preferences are in <preferences>. Every alternative must comply with them."
+      : kind === 'fix'
       ? "The author's standing preferences are in <preferences>. Enforce them only through minimal edits (spelling, notation, single-word choices); never restructure a sentence because of them."
       : "The author's standing preferences are in <preferences>. Follow all of them; if one conflicts with keeping the exact meaning, keep the meaning and mention it in the notes.");
   }
@@ -374,7 +381,8 @@ function readAlts(raw) {
 }
 /* 설명 한 줄: - [분류] "원문" → "새 표현" (대안: …): 이유   /   - [해석] "원문 구절": 설명 */
 function parseNote(line) {
-  var l = (line || '').replace(/^\s*[-*•]\s*/, '').trim(), tag = '', m;
+  var l = (line || '').replace(/^\s*(?:[-*•]|\d{1,2}[.)])\s*/, '').trim(), tag = '', m;
+  function unq(s) { return s.replace(/^["“”「『'‘’]+|["“”」』'‘’]+$/g, ''); }
   if (!l) return null;
   m = /^\[([^\]]{1,8})\]\s*/.exec(l);
   if (m) { tag = m[1]; l = l.slice(m[0].length); }
@@ -383,14 +391,14 @@ function parseNote(line) {
   if (m) return { tag: tag, from: m[1], to: m[2], alt: m[3] || '', why: m[4].trim() };
   m = new RegExp('^' + Q + IN + QE + '\\s*[:：]\\s*([\\s\\S]*)$').exec(l);
   if (m) return { tag: tag, from: m[1], to: '', alt: '', why: m[2].trim() };
-  m = /^(.+?)\s*(?:→|->|=>|⇒)\s*(.+?)\s*[:：]\s+([\s\S]+)$/.exec(l);
-  if (m) return { tag: tag, from: m[1], to: m[2], alt: '', why: m[3].trim() };
+  m = tag === '해석' ? null : /^(.+?)\s*(?:→|->|=>|⇒)\s*(.+?)\s*[:：]\s+([\s\S]+)$/.exec(l);
+  if (m) return { tag: tag, from: unq(m[1]), to: unq(m[2]), alt: '', why: m[3].trim() };
   return { tag: tag, from: '', to: '', alt: '', why: l };
 }
 /* 여러 조각의 설명을 합침: 겹치는 '없음' 줄은 다른 줄이 있을 때 뺌 */
 function mergeNotes(list) {
   var lines = [];
-  (list || []).forEach(function (n) { (n || '').split('\n').forEach(function (l) { l = l.trim(); if (l) lines.push(l); }); });
+  (list || []).forEach(function (n) { (n || '').split('\n').forEach(function (l) { l = l.trim(); if (l && lines.indexOf(l) < 0) lines.push(l); }); });
   var real = lines.filter(function (l) { return !/고칠 곳이 없습니다|특기 사항 없음/.test(l); });
   return (real.length ? real : lines.slice(0, 1)).join('\n');
 }

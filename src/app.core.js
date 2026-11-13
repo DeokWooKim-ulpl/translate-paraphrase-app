@@ -109,7 +109,7 @@ async function ask(tab, prompt, o) {
   o = o || {};
   var s = await sampleP;
   if (!s || sampleOff) return { ok: false, code: 'not_declared', msg: sampleOff || OFFMSG, text: null };
-  if (tab.job.stopped) return { ok: false, code: 'cancelled', msg: ERR.cancelled, text: null };
+  if (tab.job.stopped || (o.gen !== undefined && o.gen !== tab.job.gen)) return { ok: false, code: 'cancelled', msg: ERR.cancelled, text: null };
   var nb = bytes(prompt);
   if (nb > MAXB) return { ok: false, code: 'prompt_too_large', text: null, msg: ERR.prompt_too_large + ' (' + Math.round(nb / 1024) + ' KB, 한도 ' + Math.round(MAXB / 1024) + ' KB)' };
   var ctl = new AbortController(), mo = o.mo || modelOpts();
@@ -121,7 +121,8 @@ async function ask(tab, prompt, o) {
       if (o.onText) { try { o.onText(u.text); } catch (e) { console.warn('onText', e); } }
     }
   };
-  if (o.fresh) opts.cache = false;
+  if (o.fresh === 'refresh') opts.cache = { refresh: true };      /* 저장된 답을 새 답으로 덮어씀 */
+  else if (o.fresh) opts.cache = false;
   try {
     var r = await s(prompt, opts);
     return { ok: true, text: r.text, truncated: !!r.truncated, model: modelChip(r, mo) };
@@ -165,6 +166,7 @@ function emptyText(tab) {
 /* 한 탭에서는 한 번에 한 가지 호출만: 실행(run)이든 점검·다른 표현(side)이든 */
 function begin(tab, kind) {
   if (tab.job.busy) return 0;
+  unmark(tab);                                   /* 설명 칸 카드가 켜 둔 표시가 실행 중에 남지 않게 */
   tab.job.busy = true; tab.job.kind = kind; tab.job.stopped = false; tab.job.gen++;
   sync(tab);
   return tab.job.gen;
@@ -219,7 +221,7 @@ function syncStatusBar(tab) {
 function isStale(tab) {
   var r = tab.res;
   if (!r || r.part) return false;
-  if (tab.in.value.trim() !== r.text) return true;
+  if (tab.in.value.trim() !== r.text || noteVal(tab.k) !== (r.note || '')) return true;
   if (tab.k === 'p') return r.kind !== P.mode || (r.kind === 'para' && r.style !== P.style) || (r.kind === 'fix' && r.level !== P.level);
   return r.dst !== $('t-dst').value || r.style !== T.style;
 }
@@ -271,7 +273,7 @@ function sync(tab) {
     run.className = 'act main'; run.disabled = busy || off || !txt; run.title = 'Ctrl+Enter (Mac: ⌘+Enter)';
   }
   $(k + '-again').disabled = busy || off || !txt || !r;
-  $(k + '-copy-out').disabled = !has;
+  $(k + '-copy-out').disabled = !has || running;
   var st = $(k + '-sidetab');
   st.querySelector('[data-v="review"]').disabled = !whole || (off && !tab.review) || (busy && !tab.review);
   st.querySelector('[data-v="alt"]').disabled = !whole || off;
@@ -292,6 +294,7 @@ function sync(tab) {
 /* ---------- 결과 그리기 ---------- */
 function paint(tab) {
   var box = tab.out, r = tab.res;
+  if (tab.job.busy && tab.job.kind === 'run') return;      /* 실행 중에는 흘러나오는 글을 덮지 않음 */
   box.classList.remove('busy', 'stale');
   if (!r) { box.classList.add('empty'); box.textContent = emptyText(tab); box.removeAttribute('lang'); return; }
   box.classList.remove('empty'); box.textContent = ''; box.lang = LG[r.lang] || 'en';
@@ -335,13 +338,35 @@ function toggleChange(tab, i) {
   var sp = tab.out.querySelector('.chg[data-i="' + i + '"]');
   if (sp) sp.focus({ preventScroll: true });
 }
+/* 글을 다시 견줄 때, 사용자가 되돌려 둔 수정은 '되돌린 수정'으로 남겨 나중에 다시 적용할 수 있게 함 */
+function keepRejected(oldOps, newOps) {
+  if (!oldOps || !newOps) return newOps;
+  var rej = [], pos = 0;
+  oldOps.forEach(function (o) { if (o.rej && realChange(o)) rej.push({ at: pos, a: o.a, b: o.b }); pos += (o.s !== undefined ? o.s : o.a).length; });
+  if (!rej.length) return newOps;
+  var out = [], p = 0;
+  newOps.forEach(function (o) {
+    var end = p + (o.s !== undefined ? o.s : o.a).length;
+    if (o.s === undefined) { out.push(o); p = end; return; }
+    var cur = p;
+    rej.forEach(function (x) {
+      if (x.used || x.at < cur || x.at + x.a.length > end || o.s.substr(x.at - p, x.a.length) !== x.a) return;
+      if (x.at > cur) out.push({ s: o.s.slice(cur - p, x.at - p) });
+      out.push({ a: x.a, b: x.b, rej: true });
+      x.used = true; cur = x.at + x.a.length;
+    });
+    if (cur < end || end === p) out.push({ s: o.s.slice(cur - p) });
+    p = end;
+  });
+  return out;
+}
 /* 결과 글을 바꿈 (점검 반영, 다른 표현). why: 'review' 면 점검 목록은 그대로 둠 */
 function setOutText(tab, text, why) {
   var r = tab.res;
-  if (!r) return;
+  if (!r || (tab.job.busy && tab.job.kind === 'run')) return;      /* 새 실행이 도는 동안에는 옛 결과를 고치지 않음 */
   r.versions[r.cur].out = text;
   r.edited = true;
-  if (r.kind === 'fix') r.ops = diffChanges(r.text, text);
+  if (r.kind === 'fix') r.ops = keepRejected(r.ops, diffChanges(r.text, text));
   if (why !== 'review' && tab.review) tab.review.stale = true;
   tab.sel = null;
   refresh(tab);
@@ -352,11 +377,33 @@ function refresh(tab) {
 }
 
 /* 설명 칸에서 구절에 마우스를 올리면 결과에서 그 자리를 표시 */
+/* 구절이 결과에 여러 번 나오면, 교정에서는 실제로 고친 자리(수정 조각과 겹치는 곳)를 먼저 고름 */
+function phraseAt(tab, phrase) {
+  var r = tab.res, out = curOut(tab), first = out.indexOf(phrase);
+  if (first < 0 || r.kind !== 'fix' || !r.ops) return first;
+  var spans = [], pos = 0;
+  r.ops.forEach(function (o) {
+    var t = o.s !== undefined ? o.s : (o.rej ? o.a : o.b);
+    if (realChange(o) && !o.rej) spans.push([pos, pos + Math.max(t.length, 1)]);
+    pos += t.length;
+  });
+  for (var i = first; i >= 0; i = out.indexOf(phrase, i + 1)) {
+    if (spans.some(function (s) { return s[0] < i + phrase.length && s[1] > i; })) return i;
+  }
+  return first;
+}
+function wrapMark(node, off, len) {
+  var rg = document.createRange(), m = el('mark');
+  rg.setStart(node, off); rg.setEnd(node, off + len);
+  rg.surroundContents(m);
+  return m;
+}
 function markPhrase(tab, phrase) {
   var r = tab.res;
   if (!phrase || tab.job.busy || !r) return null;
-  var out = curOut(tab), box = tab.out, i = out.indexOf(phrase);
+  var out = curOut(tab), box = tab.out, i = phraseAt(tab, phrase);
   if (i < 0) return null;
+  if (box.querySelector('mark')) paint(tab);
   if (isPlainView(tab)) {
     box.textContent = '';
     box.appendChild(document.createTextNode(out.slice(0, i)));
@@ -366,14 +413,20 @@ function markPhrase(tab, phrase) {
     return m;
   }
   if (r.kind === 'fix' && r.ops) {
-    var pos = 0, hit = null;
-    r.ops.forEach(function (o, n) {
+    var pos = 0, hit = null, node = null, off = 0;
+    r.ops.forEach(function (o, n) {                       /* paintOps 는 조각마다 노드 하나를 붙이므로 n 번째 조각 = n 번째 자식 */
       var t = o.s !== undefined ? o.s : (o.rej ? o.a : o.b);
       if (!hit && realChange(o) && pos < i + phrase.length && pos + t.length > i) hit = box.querySelector('.chg[data-i="' + n + '"]');
+      if (!node && !realChange(o) && pos <= i && pos + t.length >= i + phrase.length) { node = box.childNodes[n]; off = i - pos; }
       pos += t.length;
     });
-    if (hit) hit.classList.add('hit');
-    return hit;
+    if (hit) { hit.classList.add('hit'); return hit; }
+    return node && node.nodeType === 3 ? wrapMark(node, off, phrase.length) : null;
+  }
+  var cells = box.querySelectorAll('.pair .new');          /* 원문과 나란히 */
+  for (var c = 0; c < cells.length; c++) {
+    var tn = cells[c].firstChild, j = tn && tn.nodeType === 3 ? tn.data.indexOf(phrase) : -1;
+    if (j >= 0) return wrapMark(tn, j, phrase.length);
   }
   return null;
 }
