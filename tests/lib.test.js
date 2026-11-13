@@ -121,7 +121,7 @@ let r = L.integrity('The linewidth is 1.2 kHz at 1,550 nm [3], see $\\Delta\\nu 
 ok('integrity ok', r.ok, r); eq('integrity counts', r.counts, { num: 2, tex: 1, cite: 1 });
 r = L.integrity('We used 3 mirrors and 10 mW [1,2].', 'We used three mirrors and 100 mW [1].');
 eq('integrity missing num', r.missing.num, ['3', '10']); eq('integrity added num', r.added.num, ['100']);
-eq('integrity missing cite', r.missing.cite, ['[1,2]']); eq('integrity added cite', r.added.cite, ['[1]']); ok('integrity not ok', !r.ok);
+eq('integrity missing cite (one number at a time)', r.missing.cite, ['[2]']); eq('integrity added cite', r.added.cite, []); ok('integrity not ok', !r.ok);
 r = L.integrity('그림 2에서 파장은 1064 nm이다 [12–14].', 'In Fig. 2 the wavelength is 1064 nm [12-14].');
 ok('integrity ko->en', r.ok, r);
 r = L.integrity('no facts here', 'still none');
@@ -146,6 +146,34 @@ ok('clip untouched', L.clipRecord(recSmall) === recSmall);
 // when
 ok('when local', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(L.when('2026-11-11T01:30:00.000Z')));
 eq('when bad', L.when('nope'), '');
+
+// ---- 2.0.1: 검증에서 나온 것 ----
+// parseTagged: 닫힌 블록 안의 닮은 태그는 글로 두고, 다시 연 태그는 뒤의 것을 씀
+p = L.parseTagged('<v2>\n<text_placeholder>\n</v2>\n\nCorrection.\n<v2>\nReal version two.\n</v2>', ['v1', 'why1', 'v2', 'why2']);
+eq('tag reopened: later wins', p.v2, 'Real version two.');
+p = L.parseTagged('<result>In XML the <notes> element holds remarks.</result><notes>- n</notes>', ['result', 'notes']);
+eq('tag look-alike inside closed block', [p.result, p.notes], ['In XML the <notes> element holds remarks.', '- n']);
+// 수치 대조: 부호, 만·억, 인용 묶음 바꾸기
+ok('integrity sign dropped', !L.integrity('a GDD of -500 fs^2', 'a GDD of 500 fs^2').ok);
+ok('integrity exponent sign', !L.integrity('a loss of 1.2 × 10^{-3} per pass', 'a loss of 1.2 × 10^{3} per pass').ok);
+ok('integrity range is not a sign', L.integrity('from 10–20 nm with a 3-dB bandwidth', 'a 3-dB bandwidth from 10–20 nm').ok);
+ok('integrity 3만 = 30,000', L.integrity('약 3만 개의 펄스를 평균하였다', 'we averaged about 30,000 pulses').ok, L.integrity('약 3만 개의 펄스를 평균하였다', 'we averaged about 30,000 pulses'));
+ok('integrity regrouped citations', L.integrity('shown in [3], [4] and [5–7]', 'shown in [3, 4] and [5, 6, 7]').ok);
+// 긴 글 나누기: 약어 뒤에서 자르지 않고 문장 끝을 줄 끝보다 먼저
+const abbr = 'We follow the method of Kim et al. [8] as shown in Fig. 3 and Eq. (4) of Ref. [7], i.e., the standard one. '.repeat(12);
+ok('chunk never cuts after an abbreviation', L.chunkText(abbr, 300).slice(0, -1).every(c => !/(et al|Fig|Eq|Ref|i\.e)\.$/.test(c.text)), L.chunkText(abbr, 300).map(c => c.text.slice(-12)));
+const wrapped = ('The oscillator delivers pulses that are stretched before amplification in the\nregenerative amplifier [12]. ').repeat(20);
+ok('chunk prefers sentence ends over line ends', L.chunkText(wrapped, 400).slice(0, -1).every(c => /\[12\]\.$/.test(c.text)), L.chunkText(wrapped, 400).map(c => c.text.slice(-14)));
+eq('chunk wrapped lossless', (() => { const ch = L.chunkText(wrapped, 400); let s = ''; ch.forEach((c, i) => { s += c.text + (i < ch.length - 1 ? c.sep : ''); }); return s; })(), wrapped);
+// 언어 추정: 수식 속 영문자는 세지 않음
+eq('lang ko with LaTeX', L.guessLang('여기서 $E(t) = A(t) \\exp\\left(i \\omega_0 t + i \\phi(t)\\right)$, $A(t) = A_0\\,\\mathrm{sech}(t/\\tau)$ 이다.'), 'ko');
+// 구절 재사용률
+ok('phrase reuse identical', L.phrasePct('the laser was locked to the cavity', 'the laser was locked to the cavity', 'en') === 100);
+ok('phrase reuse low after restructuring', L.phrasePct('the laser was locked to the cavity using the PDH technique', 'using the PDH technique, we locked the laser to the cavity', 'en') < 50);
+// 기록 줄이기: 안이 여럿이면 고르지 않은 안부터 덜어 냄
+const recV = { kind: 'para', input: '가'.repeat(8000), output: '나'.repeat(8000), sel: 8, versions: Array.from({ length: 9 }, (_, i) => ({ label: 'v' + i, text: String(i).repeat(1) + '다'.repeat(8000), why: '' })) };
+const cv = L.clipRecord(recV, 200000);
+ok('clip drops unselected versions first', L.bytes(JSON.stringify(cv)) <= 200000 && cv.input.length === 8000 && cv.versions[cv.sel].label === 'v8' && cv.versions.length < 9, [cv.versions.length, cv.sel, cv.input.length]);
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

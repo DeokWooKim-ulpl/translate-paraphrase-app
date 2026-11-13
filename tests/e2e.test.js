@@ -41,6 +41,11 @@ const T = async (p, sel) => { const l = p.locator(sel).first(); return (await l.
 const calls = p => p.evaluate(() => window.__calls.map(c => ({ state: c.state, model: c.opts.model, cache: c.opts.cache, head: c.input.slice(0, 40) })));
 const histDocs = p => p.evaluate(col => Array.from(window.__docs.entries()).filter(([k]) => k.indexOf(col + '/') === 0).map(([k, v]) => v), HCOL);
 const wait = (p, ms) => p.waitForTimeout(ms || 60);
+async function review(p, k) {
+  await p.click('#' + k + '-sidetab [data-v="review"]');
+  const go = await p.$('#' + k + '-pane-review button.main');
+  if (go) await go.click();
+}
 async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.evaluate(() => !!document.querySelector('.out.busy') || window.__calls.some(c => c.state === 'running')); if (!busy) break; await p.waitForTimeout(20); } await p.waitForTimeout(40); }
 
 (async () => {
@@ -122,7 +127,7 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     await p.click('#p-vers [data-v="2"]'); await wait(p);
     ok('3 switch version', /R1 freer/.test(await T(p, '#p-out')));
     ok('3 notes follow version', /we stabilized/.test(await T(p, '#p-pane-notes')));
-    ok('3 reuse chip', /일반 낱말 재사용 \d+%/.test(await T(p, '#p-pane-notes .hd')));
+    ok('3 reuse chip', /원문 구절 재사용 \d+%/.test(await T(p, '#p-pane-notes .hd')));
     await p.click('#p-view [data-v="pair"]');
     eq('3 pair view', await p.$$eval('#p-out .pair', xs => xs.length), 1);
     await p.click('#p-view [data-v="new"]');
@@ -178,14 +183,17 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     const { p, errs, ctx } = await open(browser);
     await p.fill('#p-in', EN);
     await p.click('#p-run'); await settle(p);
-    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await p.click('#p-sidetab [data-v="review"]'); await wait(p);
+    eq('5 opening the review tab alone spends no call', (await calls(p)).length, 1);
+    ok('5 pane explains the cost and offers the button', /호출이 한 번 더/.test(await T(p, '#p-pane-review')) && (await p.$$eval('#p-pane-review button.main', xs => xs.length)) === 1);
+    await review(p, 'p'); await settle(p);
     eq('5 review call made', (await calls(p)).length, 2);
     const rp = await p.evaluate(() => window.__calls[1].input);
     ok('5 review sees source and result', /<source>\nThe laser was lock/.test(rp) && /<result>\nThe laser was locked/.test(rp));
     eq('5 two issues', await p.$$eval('#p-pane-review .note', xs => xs.length), 2);
     ok('5 chips', /의미 확인 1건/.test(await T(p, '#p-pane-review .hd')) && /어색한 곳 1건/.test(await T(p, '#p-pane-review .hd')));
     eq('5 count chip', await T(p, '#p-review-n'), '2');
-    ok('5 unlocatable issue has no apply button', /찾지 못해/.test(await p.$eval('#p-pane-review .note >> nth=1', n => n.textContent)));
+    ok('5 unlocatable issue has no apply button', /찾지 못했습니다/.test(await p.$eval('#p-pane-review .note >> nth=1', n => n.textContent)));
     await p.click('#p-pane-review .note >> nth=0 >> button'); await wait(p);
     await p.click('#p-view [data-v="clean"]');
     ok('5 fix applied to result', /^FIXED The laser was/.test(await T(p, '#p-out')), await T(p, '#p-out'));
@@ -410,8 +418,8 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     await settle(p);
     await p.click('#p-view [data-v="marks"]');
     /* 점검 창 안의 멈추기: 글이 흐르는 중에도 눌림 */
-    await p.click('#p-sidetab [data-v="review"]');
-    await p.waitForSelector('#p-pane-review .hd button', { timeout: 3000 });
+    await review(p, 'p');
+    await p.waitForSelector('#p-pane-review .hd[data-run] button', { timeout: 3000 });
     const box = await (await p.$('#p-pane-review .hd button')).boundingBox();
     await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await p.mouse.down(); await p.waitForTimeout(90); await p.mouse.up();
     await settle(p);
@@ -442,7 +450,7 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     await p.fill('#p-in', [para, para, para, para].join('\n\n'));
     await p.click('#p-run'); await settle(p);
     const before = (await calls(p)).length;
-    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await review(p, 'p'); await settle(p);
     ok('14 long review runs in batches', (await calls(p)).length - before >= 2 && (await p.$$eval('#p-pane-review .note', xs => xs.length)) >= 2, (await calls(p)).length - before);
     /* 맥락·지시의 쉼표 든 숫자 */
     await p.click('#p-mode [data-v="para"]'); await p.fill('#p-in', EN); await p.fill('#p-note', '1,500자 이내');
@@ -452,10 +460,10 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     ok('14 changed note marks the result stale', /입력·설정이 바뀜/.test(await T(p, '#p-chips')));
     await p.fill('#p-note', '1,500자 이내');
     /* 안마다 점검을 기억 */
-    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await review(p, 'p'); await settle(p);
     await p.click('#p-vers [data-v="1"]'); await wait(p);
     ok('14 other version: review pane offers a run button', (await p.$$eval('#p-pane-review button.main', xs => xs.length)) === 1 || await p.$eval('#p-pane-review', n => n.hidden));
-    await p.click('#p-vers [data-v="0"]'); await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await p.click('#p-vers [data-v="0"]'); await review(p, 'p'); await settle(p);
     ok('14 back to first version: its review is still there', (await p.$$eval('#p-pane-review .note', xs => xs.length)) === 2);
     /* 다른 표현: 먼저 고르고 나서 탭을 열어도 보임, 키보드용 문장 고르기 */
     await p.click('#p-sidetab [data-v="notes"]');
@@ -476,12 +484,52 @@ async function settle(p) { for (let i = 0; i < 50; i++) { const busy = await p.e
     await ctx.close();
   }
 
+  /* ---------- 15. 저장 쪽 회귀: 옛 기록 불러오기, 삭제 뒤 되살아남, 다시 열기 되돌리기, 용어집 미전송분 ---------- */
+  {
+    const seed = {};
+    for (let i = 0; i < 320; i++) { const id = 'r' + String(i).padStart(3, '0'); seed[HCOL + '/' + id] = { id, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString(), kind: 'fix', lang: 'en', level: 'standard', input: 'in ' + i + (i === 5 ? ' uniqueoldword' : ''), output: 'out ' + i, notes: '', tier: 'quick' }; }
+    const { p, errs, ctx } = await open(browser, { hash: '#history', cfg: { seed } });
+    eq('15 counter shows there is more', await T(p, '#histn'), '300+');
+    await p.fill('#h-q', 'uniqueoldword'); await wait(p);
+    ok('15 search says older records are not loaded yet', /이전 기록 불러오기/.test(await T(p, '#h-list')) || /이전 기록 불러오기/.test(await T(p, '#h-more')), await T(p, '#h-list'));
+    await p.click('#h-more'); await wait(p, 150);
+    eq('15 older record found after loading', await p.$$eval('#h-list .hist', xs => xs.length), 1);
+    await p.fill('#h-q', ''); await wait(p);
+    eq('15 counter after loading all', await T(p, '#histn'), '320');
+    ok('15 model chip on history rows', /Haiku 5\.5/.test(await T(p, '#h-list .hist')));
+    ok('15 no page errors', errs.length === 0, errs);
+    await ctx.close();
+  }
+  {
+    const { p, errs, ctx } = await open(browser);
+    /* 삭제한 기록은 화면에 남은 결과를 손봐도 되살아나지 않음 */
+    await p.fill('#p-in', EN); await p.click('#p-run'); await settle(p);
+    await p.click('#tabbtn-history'); await p.click('#h-list .hist >> text=삭제'); await p.click('#h-list .hist >> text=정말 삭제?'); await wait(p, 120);
+    await p.click('#tabbtn-polish'); await p.click('#p-out .chg >> nth=0'); await p.waitForTimeout(1500);
+    eq('15 deleted record stays deleted', (await histDocs(p)).length, 0);
+    /* 다시 열기가 쓰던 글을 덮으면 되돌릴 수 있음 */
+    await p.fill('#p-in', EN); await p.click('#p-run'); await settle(p);
+    await p.fill('#p-in', '아직 실행하지 않은 새 초안입니다.'); await p.fill('#p-note', '새 메모');
+    await p.click('#tabbtn-history'); await p.click('#h-list .hist >> text=다시 열기'); await wait(p);
+    await p.click('#p-status-acts button'); await wait(p);
+    eq('15 reopen can be undone', await p.evaluate(() => [document.getElementById('p-in').value, document.getElementById('p-note').value]), ['아직 실행하지 않은 새 초안입니다.', '새 메모']);
+    /* 저장소에 못 올린 용어집은 다음에 열 때 계정 사본에 덮이지 않고 올라감 */
+    await p.click('#tabbtn-terms'); await p.fill('#pf-terms', '공진기 = cavity'); await p.waitForTimeout(1000);
+    await p.evaluate(() => { window.__dbcfg.failSet = 'unavailable'; });
+    await p.fill('#pf-terms', '공진기 = cavity\n선폭 = linewidth'); await p.waitForTimeout(2600);
+    ok('15 failed glossary save is reported', /이 브라우저에만 저장/.test(await T(p, '#pf-stat')), await T(p, '#pf-stat'));
+    const kept = await p.evaluate(() => JSON.parse(localStorage.getItem('tp.prefs')));
+    ok('15 unsynced copy kept locally', /선폭 = linewidth/.test(kept.terms) && !!kept.unsynced, kept);
+    ok('15 no page errors', errs.length === 0, errs);
+    await ctx.close();
+  }
+
   /* ---------- 13. 좁은 화면·어두운 테마: 가로 스크롤 없음 ---------- */
   for (const [name, w, dark] of [['phone-dark', 400, true], ['tablet', 900, false], ['desk', 1320, false]]) {
     const { p, errs, ctx } = await open(browser, { w, h: 800, dark });
     await p.fill('#p-in', EN + ' See https://doi.org/10.1364/OE.123456789012345678901234567890 and $\\frac{\\partial^2E}{\\partial z^2}-\\frac{1}{c^2}\\frac{\\partial^2E}{\\partial t^2}=\\mu_0\\frac{\\partial^2P}{\\partial t^2}$.');
     await p.click('#p-run'); await settle(p);
-    await p.click('#p-sidetab [data-v="review"]'); await settle(p);
+    await review(p, 'p'); await settle(p);
     for (const tab of ['polish', 'translate', 'terms', 'history']) {
       await p.click('#tabbtn-' + tab); await wait(p, 30);
       const sw = await p.evaluate(() => document.documentElement.scrollWidth);

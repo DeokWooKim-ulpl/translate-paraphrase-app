@@ -78,6 +78,9 @@ function stubRuntime() {
   function colDocs(col, q) {
     var depth = col.split('/').length + 1, arr = [];
     docs.forEach(function (v, p) { if (p.indexOf(col + '/') === 0 && p.split('/').length === depth) arr.push(p); });
+    (q.where || []).forEach(function (w) {
+      arr = arr.filter(function (pth) { var v = docs.get(pth)[w[0]]; return w[1] === '<' ? v < w[2] : w[1] === '<=' ? v <= w[2] : w[1] === '>' ? v > w[2] : w[1] === '>=' ? v >= w[2] : w[1] === '!=' ? v !== w[2] : v === w[2]; });
+    });
     if (q.order) arr.sort(function (a, b) { var x = docs.get(a)[q.order], y = docs.get(b)[q.order]; return (x < y ? -1 : x > y ? 1 : 0) * (q.dir === 'desc' ? -1 : 1); });
     else arr.sort();
     return arr.slice(0, q.n || 1000).map(snapOf);
@@ -101,7 +104,7 @@ function stubRuntime() {
   function query(col, q) {
     return {
       path: col,
-      where: function () { return query(col, q); },
+      where: function (f, op, v) { return query(col, Object.assign({}, q, { where: (q.where || []).concat([[f, op, v]]) })); },
       orderBy: function (f, dir) { return query(col, Object.assign({}, q, { order: f, dir: dir || 'asc' })); },
       limit: function (n) { return query(col, Object.assign({}, q, { n: n })); },
       get: async function () { var ds = colDocs(col, q); return { docs: ds, size: ds.length, empty: !ds.length, metadata: { fromCache: false, hasPendingWrites: false } }; },
@@ -109,6 +112,7 @@ function stubRuntime() {
       doc: function (id) { return docRef(col + '/' + (id || 'auto' + Math.random().toString(36).slice(2))); }
     };
   }
+  Object.keys(window.__cfg.seed || {}).forEach(function (pth) { docs.set(pth, JSON.parse(JSON.stringify(window.__cfg.seed[pth]))); });
   var db = { doc: docRef, collection: function (p) { return query(p, {}); } };
   var user = { id: async function () { return window.__cfg.noUser ? null : 'u_testuser0123456789abcd'; } };
   window.__saved = [];

@@ -17,7 +17,7 @@
     "user": {},
     "downloads": true
   },
-  "app_version": "2.0.0",
+  "app_version": "2.0.1",
   "models": {
     "quick": {
       "model": "claude-haiku-5-5",

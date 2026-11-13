@@ -72,7 +72,7 @@
           </div>
           <div class="status none" id="p-statusbar"><span class="t" id="p-status" role="status"></span><span class="row" id="p-status-acts"></span><span class="row" id="p-chips"></span></div>
           <div class="out empty" id="p-out"></div>
-          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시 교정</button><button type="button" class="act" id="p-use" disabled title="결과를 왼쪽 입력 칸에 넣습니다">입력으로</button><button type="button" class="act" id="p-send" disabled title="결과를 번역 탭의 입력 칸으로 보냅니다">번역 탭 →</button></div></div>
+          <div class="bar bottom"><button type="button" class="act" id="p-copy-out" disabled>복사</button><div class="row"><button type="button" class="act" id="p-again" disabled>다시 교정</button><button type="button" class="act" id="p-use" disabled title="결과를 입력 칸에 넣습니다 (이어서 다듬기)">입력으로</button><button type="button" class="act" id="p-send" disabled title="결과를 번역 탭의 입력 칸으로 보냅니다">번역으로 →</button></div></div>
         </div>
         <div>
           <div class="bar"><nav class="sub" role="group" aria-label="설명" id="p-sidetab">
@@ -132,7 +132,7 @@
           </div>
           <div class="status none" id="t-statusbar"><span class="t" id="t-status" role="status"></span><span class="row" id="t-status-acts"></span><span class="row" id="t-chips"></span></div>
           <div class="out empty" id="t-out"></div>
-          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시 번역</button><button type="button" class="act" id="t-fix" disabled title="번역 결과를 교정·패러프레이즈 탭의 입력 칸으로 보냅니다">교정 탭 →</button><button type="button" class="act" id="t-para" disabled title="번역 결과를 교정·패러프레이즈 탭의 입력 칸으로 보냅니다">패러프레이즈 탭 →</button></div></div>
+          <div class="bar bottom"><button type="button" class="act" id="t-copy-out" disabled>복사</button><div class="row"><button type="button" class="act" id="t-again" disabled>다시 번역</button><button type="button" class="act" id="t-fix" disabled title="번역 결과를 교정·패러프레이즈 탭의 입력 칸으로 보냅니다">교정으로 →</button><button type="button" class="act" id="t-para" disabled title="번역 결과를 교정·패러프레이즈 탭의 입력 칸으로 보냅니다">패러프레이즈로 →</button></div></div>
         </div>
         <div>
           <div class="bar"><nav class="sub" role="group" aria-label="설명" id="t-sidetab">
@@ -170,10 +170,10 @@
         </div>
       </div>
       <div class="help">
-        <code>공진기 = cavity</code><span>번역쌍 (양방향). 번역할 때 한쪽이 나오면 다른 쪽으로 옮기고, 같은 언어 안에서는 다른 낱말로 바꾸지 않습니다.</span>
+        <code>공진기 = cavity</code><span>번역쌍 (양방향). 번역할 때 한쪽이 나오면 다른 쪽으로 옮기고, 같은 언어 안에서는 다른 단어로 바꾸지 않습니다.</span>
         <code>pulse width &gt; pulse duration</code><span>왼쪽 대신 오른쪽을 씁니다.</span>
         <code>!very</code><span>원문에 없으면 쓰지 않습니다.</span>
-        <code>Yb:KGW</code><span>한 줄에 낱말만 적으면 어느 언어에서든 그대로 둡니다.</span>
+        <code>Yb:KGW</code><span>한 줄에 단어만 적으면 어느 언어에서든 그대로 둡니다.</span>
         <code># 메모</code><span><code>#</code> 으로 시작하는 줄은 보내지 않습니다.</span>
         <code>en: … / ko: …</code><span>지침 앞에 언어를 붙이면 결과가 그 언어일 때만 보냅니다. 붙이지 않으면 항상 보냅니다.</span>
       </div>
@@ -192,7 +192,7 @@
         </nav>
         <input class="txt" id="h-q" type="search" placeholder="검색" aria-label="기록 검색" style="max-width:220px">
       </div>
-      <p class="meta" id="h-desc">교정·패러프레이즈·번역 결과가 쌓입니다. 기록은 이 계정에만 저장되어 다른 사람에게는 보이지 않으며, 최근 300개까지 보입니다.</p>
+      <p class="meta" id="h-desc">교정·패러프레이즈·번역 결과가 쌓입니다. 기록은 이 계정에만 저장되어 다른 사람에게는 보이지 않으며, 최근 300건을 먼저 보여 주고, 「이전 기록 불러오기」로 더 옛 기록도 볼 수 있습니다.</p>
       <p class="msg err" id="h-note" role="status" hidden></p>
       <div id="h-list" style="display:flex;flex-direction:column;gap:8px"></div>
       <div class="row">
@@ -205,6 +205,6 @@
     </div>
   </section>
 
-  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · Ctrl+Enter 실행 · Esc 멈춤 · app 2.0.0</div>
+  <div class="foot">Claude 호출은 보는 사람의 claude.ai 사용량으로 나갑니다(첫 사용 때 동의 창). 결과는 반드시 직접 확인한 뒤 쓰세요. · Ctrl+Enter 실행 · Esc 멈춤 · 2.0.1 판</div>
   <div id="sr" class="sr" role="status"></div>
 </div>

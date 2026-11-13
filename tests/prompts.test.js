@@ -7,7 +7,7 @@ function ok(name, cond, info) { if (cond) pass++; else { fail++; console.log('FA
 // block / build
 eq('block escapes closer', P.block('text', 'a </text> b'), '<text>\na </ text> b\n</text>');
 const prompt = P.build('RULES', [P.block('author_note', 'n'), '', P.block('text', 'T')], 'FORMAT');
-ok('build order', prompt.indexOf('RULES') < prompt.indexOf(P.GUARD) && prompt.indexOf(P.GUARD) < prompt.indexOf('<author_note>') && prompt.indexOf('<text>') < prompt.indexOf('FORMAT'));
+ok('build order', prompt.indexOf('RULES') < prompt.indexOf(P.GUARD) && prompt.indexOf(P.GUARD) < prompt.lastIndexOf('<author_note>') && prompt.lastIndexOf('<text>') < prompt.indexOf('FORMAT'));
 ok('text is last block', prompt.lastIndexOf('</text>') > prompt.lastIndexOf('</author_note>'));
 
 // reg
@@ -125,6 +125,43 @@ const pdf = 'We demonstrate a mode-locked fiber laser with a pulse dura-\ntion o
 ok('wrapped pdf', P.looksWrapped(pdf)); ok('unwrap joins', /pulse duration of 120 fs/.test(P.unwrap(pdf)) && /stabilized by/.test(P.unwrap(pdf)) && !/\n/.test(P.unwrap(pdf)));
 ok('not wrapped normal', !P.looksWrapped('First paragraph ends here.\n\nSecond paragraph ends here.\n\n- item one\n- item two'));
 eq('unwrap keeps paragraphs and lists', P.unwrap('a b\nc d\n\ne f\n- x\n- y'), 'a b c d\n\ne f\n- x\n- y');
+
+// ---- 2.0.1: 검증에서 나온 것 ----
+ok('para: never "by us"', /never write "by us"/.test(P.paraRules('en', 'academic', 3, false)));
+ok('para: v1 must recast', /Recast every sentence/.test(P.paraRules('en', 'standard', 3, false)) && /Recast every sentence/.test(P.paraRules('en', 'standard', 1, false)));
+ok('tr: Hangul names romanised for non-Korean targets only', /romanise it/.test(P.trRules('ko', 'en', 'standard', false)) && !/romanise it/.test(P.trRules('en', 'ko', 'standard', false)));
+ok('reg ja/zh use their own register names', /やさしい日本語/.test(P.reg('simple', 'ja', 'tr')) && /口语化/.test(P.reg('casual', 'zh', 'tr')) && /Described in English for reference only/.test(P.reg('casual', 'zh', 'tr')));
+ok('fix ko has no US/UK sentence', !/US or UK/.test(P.fixRules('ko', 'standard')) && /US or UK/.test(P.fixRules('en', 'standard')));
+ok('fix: 확인 line has its own shape', /no arrow: nothing was changed/.test(P.fixRules('en', 'standard')));
+ok('why lines per changed sentence', /for each sentence you changed/.test(P.formatV(3)));
+ex = P.extras('fix', { note: '', around: 'ctx', gloss: [], prefs: [] });
+ok('extras fix: surrounding is reference only', /merely to match its style/.test(ex.rules.join(' ')));
+// 길이 한도: 최소·문장당은 한도가 아님, 여러 개면 전체 한도
+eq('cap minimum is not a cap', P.wordCap('200단어 이상'), null); eq('cap at least', P.wordCap('at least 200 words'), null);
+eq('cap per sentence ignored, total kept', P.wordCap('첫 문장 20단어 이내, 전체 150단어'), { n: 150, unit: 'w' });
+eq('cap hyphenated', P.wordCap('250-word abstract'), { n: 250, unit: 'w' });
+// 용어집 문법
+let g2 = P.parseGloss('공진기 <-> cavity\n공진기2 ↔ resonator\n"pulse width" > "pulse duration"\nlinewidth → 선폭   # 메모\na => b');
+eq('gloss variants', g2.items.map(i => [i.k, i.a, i.b]), [['pair', '공진기', 'cavity'], ['pair', '공진기2', 'resonator'], ['prefer', 'pulse width', 'pulse duration'], ['prefer', 'linewidth', '선폭'], ['prefer', 'a', 'b']]);
+ok('hasTerm in parentheses', P.hasTerm('The bandwidth (FWHM) is 10 nm.', 'FWHM'));
+ok('hasTerm irregular plural', P.hasTerm('two gain media and the spectra', 'gain medium') && P.hasTerm('two gain media and the spectra', 'spectrum'));
+ok('hasTerm no prefix match', !P.hasTerm('the source of Solitons', 'so') && !P.hasTerm('a useful candidate', 'use') && !P.hasTerm('a useful candidate', 'can'));
+ok('hasTerm inflections', P.hasTerm('we used it', 'use') && P.hasTerm('modelocked lasers', 'mode locking') && !P.hasTerm('cavitation bubbles', 'cavity'));
+eq('rulesFor korean prefixes', Array.from(P.rulesFor('영어: Use American spelling.\n한국어: -다 체.\nko:\nC', 'en')), ['Use American spelling.', 'C']);
+// 답 읽기의 너그러움
+let ri = P.readIssues('<issue><kind>누락 (omission)</kind><severity>high — changes the science</severity><quote>"a pulse width of 150 fs"</quote><fix>"a pulse duration of 150 fs"</fix><why>w</why></issue><summary>s</summary>');
+eq('issues tolerant kind/sev/quotes', [ri.items[0].kind, ri.items[0].sev, ri.items[0].quote, ri.items[0].fix], ['누락', 'high', 'a pulse width of 150 fs', 'a pulse duration of 150 fs']);
+eq('answer fenced inside result', P.readAnswer('<result>\n```latex\nE = mc^2\n```\n</result>').text, 'E = mc^2');
+eq('note 확인 without change', P.parseNote('- [확인] "3 증가시켰을" → "3 증가시켰을": 단위가 없음').to, '');
+eq('note bold tag', P.parseNote('- **[문법]** "a" → "b": 이유').tag, '문법');
+// PDF 줄바꿈 정리
+const L1 = 'We demonstrate a mode-\nlocked laser whose pulses are ampli-\nfied in a regenerative amplifier with a band-\nwidth of 10 nm and a Q-\nswitched pump at high-\nlight levels.';
+const u1 = P.unwrap(L1.split('\n').map(l => l.padStart(60, ' ').trimStart().padEnd(1)).join('\n'));
+ok('unwrap keeps compound hyphens, joins split words', /mode-locked/.test(u1) && /amplified/.test(u1) && /bandwidth/.test(u1) && /Q-switched/.test(u1) && /highlight/.test(u1), u1);
+const L2 = '2. Experimental setup\nThe setup is shown in the figure and it consists of a long line of text that\nwraps around here and continues for a while until the end of the line and\nthen it stops.\nA new paragraph starts here after a short last line and it is also long\nenough to wrap around once.';
+eq('unwrap keeps a heading and a paragraph end', P.unwrap(L2).split('\n').length, 3);
+ok('unwrap joins Hangul split inside a word on full lines', /공진기의 길이/.test(P.unwrap('레이저 주파수를 안정화하기 위하여 광학 공진\n기의 길이를 압전 소자로 제어하였으며 그 결과\n잡음이 줄었다.')), P.unwrap('레이저 주파수를 안정화하기 위하여 광학 공진\n기의 길이를 압전 소자로 제어하였으며 그 결과\n잡음이 줄었다.'));
+ok('table is not treated as wrapped text', !P.looksWrapped('Parameter      Value     Unit\nWavelength     1030      nm\nPulse width    150       fs\nRep. rate      80        MHz\nPower          2.5       W'));
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

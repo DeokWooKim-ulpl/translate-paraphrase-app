@@ -16,7 +16,7 @@ function when(iso) {
 
 /* 글의 언어 추정: 'ko' | 'en' | 'ja' | 'zh'. 한글이 글자의 10% 이상이거나 낱말 넷 중 하나에 한글이 있으면 한국어(영어 용어가 많은 물리 글 대비) */
 function guessLang(text) {
-  var t = text || '';
+  var t = (text || '').replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/g, ' ').replace(/\\[A-Za-z]+/g, ' ');
   var hangul = (t.match(/[가-힣]/g) || []).length;
   var kana = (t.match(/[぀-ヿ]/g) || []).length;
   var han = (t.match(/[一-鿿]/g) || []).length;
@@ -37,7 +37,6 @@ function guessLang(text) {
    돌려주는 값: {태그이름: 내용, …, _any: 태그를 하나라도 찾았는지, _open: 아직 닫히지 않은 태그} */
 function parseTagged(text, tags) {
   var t = text || '', out = { _any: false, _open: '' }, i;
-  /* 끝에 반쯤 온 태그(<no, </resu …)는 화면에 보이지 않게 잘라 냄 */
   var tail = /<\/?[A-Za-z0-9_]*$/.exec(t);
   if (tail) {
     var frag = tail[0].replace(/^<\/?/, '').toLowerCase();
@@ -45,21 +44,27 @@ function parseTagged(text, tags) {
       if (tags[i].indexOf(frag) === 0) { t = t.slice(0, tail.index); break; }
     }
   }
-  var lower = t.toLowerCase(), marks = [];
-  for (i = 0; i < tags.length; i++) {
-    var open = '<' + tags[i] + '>', k = lower.indexOf(open);
-    if (k >= 0) marks.push({ tag: tags[i], at: k, start: k + open.length });
+  var lower = t.toLowerCase(), pos = 0;
+  function nextOpen(from) {
+    var best = null;
+    for (var j = 0; j < tags.length; j++) {
+      var k = lower.indexOf('<' + tags[j] + '>', from);
+      if (k >= 0 && (!best || k < best.at)) best = { tag: tags[j], at: k, start: k + tags[j].length + 2 };
+    }
+    return best;
   }
-  marks.sort(function (a, b) { return a.at - b.at; });
-  for (i = 0; i < marks.length; i++) {
-    var m = marks[i], close = '</' + m.tag + '>';
-    var end = lower.indexOf(close, m.start);
-    var next = i + 1 < marks.length ? marks[i + 1].at : -1;
-    var stop;
-    if (end >= 0 && (next < 0 || end < next)) stop = end;
-    else if (next >= 0) stop = next;
-    else { stop = t.length; out._open = m.tag; }
-    out[m.tag] = t.slice(m.start, stop).replace(/^\s*\n/, '').replace(/\s+$/, '');
+  for (;;) {
+    var m = nextOpen(pos);
+    if (!m) break;
+    var close = '</' + m.tag + '>', end = lower.indexOf(close, m.start), stop;
+    if (end >= 0) { stop = end; pos = end + close.length; out._open = ''; }
+    else {
+      var nx = nextOpen(m.start);
+      if (nx) { stop = nx.at; pos = nx.at; out._open = ''; } else { stop = t.length; pos = t.length; out._open = m.tag; }
+    }
+    var body = t.slice(m.start, stop), again = body.toLowerCase().lastIndexOf('\n<' + m.tag + '>\n');
+    if (again >= 0) body = body.slice(again + m.tag.length + 3);         /* 머리말에서 태그 이름을 되뇐 답 */
+    out[m.tag] = body.replace(/^\s*\n/, '').replace(/\s+$/, '');
     out._any = true;
   }
   if (!out._any) out._plain = t.trim();
@@ -174,17 +179,22 @@ function composeChanges(list) {
 /* ---------- 긴 글 나누기 (번역용) ----------
    돌려주는 값: [{text, sep}] — sep 은 그 조각 뒤에 원문에서 있던 구분(빈 줄·줄바꿈·공백·없음).
    문단 경계 > 줄바꿈 > 문장 끝(한중일 마침표 포함) > 공백 > 글자 순으로 자름. */
+var ABBR_END = /(?:\b(?:Figs?|Eqs?|Refs?|Secs?|Tabs?|Nos?|Vol|pp?|al|i\.e|e\.g|cf|vs|approx|ca|Dr|Prof|Mr|Ms|Mrs|St|resp|viz)|\b[A-Z])\.$/;
 function splitLong(p, max) {
   var out = [], rest = p;
   while (cc(rest) > max) {
     var head = Array.from(rest).slice(0, max).join('');
-    var floor = head.length * 0.3, cut = -1, k, m;
-    k = head.lastIndexOf('\n');
-    if (k > floor) cut = k + 1;
-    if (cut < 0) {
-      var re = /[。！？]+|[.!?]+["')\]]*(?=\s)/g;
-      while ((m = re.exec(head))) { if (m.index + m[0].length > floor) cut = m.index + m[0].length; }
+    var floor = head.length * 0.3, cut = -1, k, m, soft = -1;
+    /* 1) 문장이 끝난 자리(줄 끝이면 더 좋음). 'Fig.' 'et al.' 같은 약어의 마침표는 문장 끝이 아님 */
+    var re = /[。！？]+|．+(?![0-9０-９])|[.!?]+["')\]]*(?=\s)/g;
+    while ((m = re.exec(head))) {
+      var e = m.index + m[0].length;
+      if (e <= floor) continue;
+      if (m[0].charAt(0) === '.' && ABBR_END.test(head.slice(Math.max(0, m.index - 8), m.index + 1))) continue;
+      cut = e;
     }
+    /* 2) 문장 끝이 없으면 줄바꿈(목록·표·수식 줄), 3) 공백, 4) 글자 */
+    if (cut < 0) { k = head.lastIndexOf('\n'); if (k > floor) cut = k + 1; }
     if (cut < 0) { k = head.search(/\s\S*$/); if (k > floor) cut = k + 1; }
     if (cut < 0) cut = head.length;
     var piece = rest.slice(0, cut);
@@ -198,6 +208,7 @@ function splitLong(p, max) {
   if (rest) out.push({ text: rest, sep: '' });
   return out;
 }
+
 function chunkText(text, max) {
   var parts = (text || '').split(/(\n{2,})/), units = [], i;
   for (i = 0; i < parts.length; i += 2) {
@@ -228,22 +239,33 @@ function joinSep(sep, dst) {
 
 /* ---------- 수치·수식·인용 보존 검사 (모델 호출 없음) ----------
    원문에 있던 숫자, LaTeX 수식, [n] 인용 번호가 결과에도 같은 개수로 있는지 봄. */
+var BIGNUM = { '천': 1e3, '만': 1e4, '억': 1e8, '조': 1e12, thousand: 1e3, million: 1e6, billion: 1e9 };
 function extractFacts(text) {
   var t = text || '', facts = { num: [], tex: [], cite: [] }, m;
   var texRe = /\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]/g;
   while ((m = texRe.exec(t))) facts.tex.push(m[0].replace(/\s+/g, ''));
   var plain = t.replace(texRe, ' ');
+  /* 인용: [3], [4] 와 [3, 4], [5–7] 과 [5, 6, 7] 은 같은 것으로 봄 → 번호 하나씩 */
   var citeRe = /\[\s*\d+(?:\s*[-–,]\s*\d+)*\s*\]/g;
-  while ((m = citeRe.exec(plain))) facts.cite.push(m[0].replace(/\s+/g, '').replace(/–/g, '-'));
+  while ((m = citeRe.exec(plain))) {
+    m[0].replace(/[\[\]\s]/g, '').split(',').forEach(function (part) {
+      var r = part.split(/[-–]/), a = +r[0], b = r.length > 1 ? +r[1] : a;
+      if (b >= a && b - a <= 50) { for (var n = a; n <= b; n++) facts.cite.push('[' + n + ']'); } else facts.cite.push('[' + part.replace(/–/g, '-') + ']');
+    });
+  }
   plain = plain.replace(citeRe, ' ');
-  var numRe = /\d+(?:[.,]\d+)*/g;
+  /* 숫자: 앞의 음수 부호(범위 10–20, 3-dB 의 줄표는 부호가 아님)와 뒤의 만·억·million 을 함께 읽음 */
+  var numRe = /(^|[\s(\[{=<>≈~×*\/^:,;])?([-−–])?(\d+(?:[.,]\d+)*(?:[eE][-+−]?\d+)?)(?:\s*(천|만(?!큼)|억|조(?![가-힣]))|\s+(thousand|million|billion)\b)?/g;
   while ((m = numRe.exec(plain))) {
-    var s = m[0];
-    if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) facts.num.push(s.replace(/,/g, ''));
-    else s.split(',').forEach(function (x) { if (x) facts.num.push(x); });
+    var neg = m[2] && m[1] !== undefined && (m[2] !== '–' || !/\s/.test(m[1])) ? '-' : '';   /* 띄어 쓴 – 는 범위 표시로 봄 */
+    var s = m[3], mult = BIGNUM[m[4] || (m[5] || '').toLowerCase()];
+    if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+    if (mult && /^\d+(\.\d+)?$/.test(s)) { facts.num.push(neg + String(Math.round(parseFloat(s) * mult))); continue; }
+    s.split(',').forEach(function (x, i) { if (x) facts.num.push((i ? '' : neg) + x); });
   }
   return facts;
 }
+
 function bagDiff(a, b) {           /* a 에는 있고 b 에는 없는 것(개수까지 따짐) */
   var count = {}, out = [];
   b.forEach(function (x) { count[x] = (count[x] || 0) + 1; });
@@ -289,11 +311,35 @@ function overlapPct(a, b, lang) {
   return Math.round(100 * n / B.length);
 }
 
+/* 원문 구절 재사용률: 결과의 세 단어 묶음 가운데 원문에도 그대로 있는 비율.
+   용어·숫자는 그대로여도 문장을 다시 지었으면 낮아지므로 '얼마나 다시 썼나'를 낱말 비교보다 잘 보여 줌 */
+function phrasePct(a, b, lang) {
+  function grams(t) {
+    var w = (t || '').toLowerCase().match(lang === 'ko' ? /[\uAC00-\uD7A3]+|[a-z0-9]+/g : /[\p{L}\p{N}]+/gu) || [], g = [];
+    for (var i = 0; i + 3 <= w.length; i++) g.push(w.slice(i, i + 3).join(' '));
+    return g;
+  }
+  var A = new Set(grams(a)), B = grams(b), n = 0;
+  if (!B.length) return 0;
+  B.forEach(function (x) { if (A.has(x)) n++; });
+  return Math.round(100 * n / B.length);
+}
+
 /* 기록 한 건이 저장 한도(256 KiB)를 넘지 않게 긴 글을 줄임. 줄였으면 clipped:true */
 function clipRecord(rec, maxBytes) {
   var cap = maxBytes || 200000;
   if (bytes(JSON.stringify(rec)) <= cap) return rec;
   var r = Object.assign({}, rec), guard = 0;
+  /* 패러프레이즈 안이 여럿이면 고르지 않은 오래된 안부터 덜어 냄 */
+  if (Array.isArray(r.versions) && r.versions.length > 1) {
+    var vs = r.versions.slice(), sel = Math.min(Math.max(0, r.sel || 0), vs.length - 1);
+    while (vs.length > 1 && bytes(JSON.stringify(Object.assign({}, r, { versions: vs }))) > cap) {
+      var drop = sel === 0 ? 1 : 0;
+      vs.splice(drop, 1);
+      if (drop < sel) sel--;
+    }
+    r.versions = vs; r.sel = sel;
+  }
   while (bytes(JSON.stringify(r)) > cap && guard++ < 40) {
     ['input', 'output', 'notes'].forEach(function (k) {
       if (typeof r[k] === 'string' && r[k].length > 2000) r[k] = r[k].slice(0, Math.floor(r[k].length * 0.8));
@@ -305,5 +351,5 @@ function clipRecord(rec, maxBytes) {
 
 if (typeof module !== 'undefined') {
   module.exports = { cc: cc, wc: wc, bytes: bytes, fmt: fmt, when: when, guessLang: guessLang, parseTagged: parseTagged, diffRaw: diffRaw, diffChanges: diffChanges, composeChanges: composeChanges,
-    splitLong: splitLong, chunkText: chunkText, joinSep: joinSep, extractFacts: extractFacts, integrity: integrity, overlapPct: overlapPct, clipRecord: clipRecord };
+    splitLong: splitLong, chunkText: chunkText, joinSep: joinSep, extractFacts: extractFacts, integrity: integrity, overlapPct: overlapPct, phrasePct: phrasePct, clipRecord: clipRecord };
 }

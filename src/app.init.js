@@ -37,8 +37,8 @@ function settings() {
 }
 function applySettings(d) {
   if (!d || typeof d !== 'object') return;
-  function has(nav, v) { return !!v && !!$(nav).querySelector('button[data-v="' + v + '"]'); }
-  function opt(sel, v) { return !!v && !!$(sel).querySelector('option[value="' + v + '"]'); }
+  function has(nav, v) { return typeof v === 'string' && Array.prototype.some.call($(nav).querySelectorAll('button[data-v]'), function (b) { return b.dataset.v === v; }); }
+  function opt(sel, v) { return typeof v === 'string' && Array.prototype.some.call($(sel).options, function (o) { return o.value === v; }); }
   if (opt('tier', d.tier)) tier.value = d.tier;
   if (has('p-lang', d.pLangSel)) { P.langSel = d.pLangSel; pick($('p-lang'), P.langSel); }
   if (d.pMode === 'fix' || d.pMode === 'para') { P.mode = d.pMode; pick($('p-mode'), P.mode); }
@@ -55,7 +55,7 @@ function applySettings(d) {
 function saveSettings() { LS('tp.set', JSON.stringify(settings())); }
 function saveDrafts() {
   [['tp.p', P.in.value], ['tp.t', T.in.value], ['tp.around', $('p-around').value], ['tp.pnote', $('p-note').value], ['tp.tnote', $('t-note').value]].forEach(function (x) {
-    if (x[1].length <= 200000) LS(x[0], x[1] || null);
+    LS(x[0], x[1].length <= 200000 ? (x[1] || null) : null);
   });
 }
 var saveDraftsLater = debounce(saveDrafts, 400);
@@ -83,24 +83,32 @@ $('p-copy-out').onclick = function () { copyText(curOut(P), this); };
 $('p-clear').onclick = function () { clearInput(P); };
 $('p-use').onclick = useAsInput;
 $('p-send').onclick = toTranslate;
-$('p-unwrap').onclick = function () { setIn(P.in, unwrap(P.in.value)); setStatus(P, 'PDF에서 붙여 넣은 줄바꿈을 문단으로 이었습니다. 하이픈으로 끊긴 낱말을 확인하세요.', ''); P.undo = true; };
+$('p-unwrap').onclick = function () { setIn(P.in, unwrap(P.in.value)); setStatus(P, 'PDF에서 붙여 넣은 줄바꿈을 문단으로 이었습니다. 하이픈으로 끊긴 단어와 한글 띄어쓰기를 확인하세요.', ''); P.undo = true; };
 sub($('p-vers'), function (v) {
   var r = P.res;
   if (!r || P.job.busy) { renderVers(P); return; }
   r.cur = +v; P.review = r.versions[r.cur].review || null; P.alt = null; P.sel = null;
   if (!P.review && P.side === 'review') setSide(P, 'notes');
   refresh(P); queueSave(P);
+  var nb = $('p-vers').querySelector('[data-v="' + v + '"]');
+  if (nb) nb.focus({ preventScroll: true });
 });
 sub($('p-view'), function (v) {
   if (!P.res) return;
   if (P.res.kind === 'fix') P.vFix = v; else P.vText = v;
   paint(P); renderSide(P); saveSettings();
 });
-sub($('p-sidetab'), function (v) { setSide(P, v); if (v === 'review' && !P.review) runReview(P); });
+sub($('p-sidetab'), function (v) { setSide(P, v); if (v === 'review' && !P.review) { var go = $('p-pane-review').querySelector('button.main'); if (go) go.focus({ preventScroll: true }); } });
 P.out.addEventListener('click', function (e) { var sp = e.target.closest('.chg'); if (sp) toggleChange(P, +sp.dataset.i); });
 P.out.addEventListener('keydown', function (e) {
   var sp = e.target.closest('.chg');
   if (sp && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleChange(P, +sp.dataset.i); }
+  var dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+  if (sp && dir) {
+    var all = Array.prototype.slice.call(P.out.querySelectorAll('.chg')), to = all[all.indexOf(sp) + dir];
+    e.preventDefault();
+    if (to) { sp.tabIndex = -1; to.tabIndex = 0; to.focus(); if (P.res) P.res.chgAt = +to.dataset.i; }
+  }
 });
 
 /* ---------- 번역 탭 ---------- */
@@ -115,14 +123,13 @@ $('t-copy-in').onclick = function () { copyText(T.in.value, this); };
 $('t-copy-out').onclick = function () { copyText(curOut(T), this); };
 $('t-clear').onclick = function () { clearInput(T); };
 $('t-swap').onclick = swapLangs;
-$('t-unwrap').onclick = function () { setIn(T.in, unwrap(T.in.value)); setStatus(T, 'PDF에서 붙여 넣은 줄바꿈을 문단으로 이었습니다. 하이픈으로 끊긴 낱말을 확인하세요.', ''); T.undo = true; };
+$('t-unwrap').onclick = function () { setIn(T.in, unwrap(T.in.value)); setStatus(T, 'PDF에서 붙여 넣은 줄바꿈을 문단으로 이었습니다. 하이픈으로 끊긴 단어와 한글 띄어쓰기를 확인하세요.', ''); T.undo = true; };
 $('t-fix').onclick = function () { var r = T.res; if (r && !r.part) toPolish(curOut(T), 'fix', r.dst, ''); };
 $('t-para').onclick = function () { var r = T.res; if (r && !r.part) toPolish(curOut(T), 'para', r.dst, r.style); };
 sub($('t-view'), function (v) { if (!T.res) return; T.vText = v; paint(T); renderSide(T); saveSettings(); });
 sub($('t-sidetab'), function (v) {
   setSide(T, v);
-  if (v === 'review' && !T.review) runReview(T);
-  if (v === 'back' && !T.back) runBack();
+  if (v === 'review' && !T.review) { var go = $('t-pane-review').querySelector('button.main'); if (go) go.focus({ preventScroll: true }); }
 });
 
 /* 맥락·지시: 자주 쓰는 지시 고르면 입력 칸에 덧붙임 */
@@ -163,7 +170,7 @@ $('pf-rules-sample').onclick = function () {
 /* ---------- 기록 탭 ---------- */
 sub($('h-filter'), function (v) { hFilter = v; histShown = 50; renderHist(); });
 $('h-q').addEventListener('input', function () { histShown = 50; renderHist(); });
-$('h-more').onclick = function () { histShown += 50; renderHist(); };
+$('h-more').onclick = function () { histShown += 50; if (shownHist().length < histShown && moreOlder()) loadOlder(); else renderHist(); };
 $('h-clear').onclick = function () { clearHist(this); };
 $('h-md').onclick = function () { copyText(histMarkdown(), this); };
 dlP.then(function (dl) {
@@ -199,7 +206,23 @@ document.addEventListener('keydown', function (e) {
   if (tab && tab.job.busy) { e.preventDefault(); stopJob(tab); }
 });
 tier.addEventListener('change', saveSettings);
-window.addEventListener('pagehide', function () { saveDrafts(); saveSettings(); flushSave(P); flushSave(T); prefsSave(); });
+/* 페이지를 떠날 때: 초안·설정을 적고, 아직 저장소에 못 보낸 마지막 손질은 이 브라우저에도 한 부 남김 (다음에 열 때 계정으로 올림).
+   휴대폰에서는 pagehide 가 안 올 수 있어 화면이 가려질 때도 같은 일을 함 */
+function stashOpen() {
+  [P, T].forEach(function (tab) {
+    var r = tab.res;
+    if (!tab.saveT || !r || r.part || r.noSave) return;
+    if (!r.histId) r.histId = newId();
+    var rec = clipRecord(resToRec(tab));
+    rec.local = 1;
+    localOnly = localOnly.filter(function (h) { return h.id !== rec.id; });
+    localOnly.unshift(rec);
+    localSave();
+  });
+}
+function leave() { saveDrafts(); saveSettings(); stashOpen(); flushSave(P); flushSave(T); prefsSave(); }
+window.addEventListener('pagehide', leave);
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') leave(); });
 
 /* ---------- 새 판이 게시될 때 화면 상태 넘겨주기 (뷰어가 지원할 때만) ---------- */
 function hotState() {
@@ -223,7 +246,7 @@ if (oldTier === 'quick' || oldTier === 'deep') tier.value = oldTier;       /* 1.
 applySettings(LSjson('tp.set'));
 loadDrafts();
 var savedPrefs = LSjson('tp.prefs');
-if (savedPrefs) prefs = { terms: typeof savedPrefs.terms === 'string' ? savedPrefs.terms : '', rules: typeof savedPrefs.rules === 'string' ? savedPrefs.rules : '' };
+if (savedPrefs) { prefs = { terms: typeof savedPrefs.terms === 'string' ? savedPrefs.terms : '', rules: typeof savedPrefs.rules === 'string' ? savedPrefs.rules : '' }; prefsAt = typeof savedPrefs.at === 'string' ? savedPrefs.at : ''; prefsUnsynced = !!savedPrefs.unsynced; }
 prefsShow();
 localLoad(); renderHist();
 refresh(P); refresh(T); setSide(P, 'notes'); setSide(T, 'notes');
@@ -231,7 +254,7 @@ pCount(); tCount();
 showTab(location.hash.slice(1) || LS('tp.tab') || LS('tab') || 'polish');
 openStore();
 sampleP.then(function (s) {
-  if (!s) { killSample('이 화면에서는 Claude를 부를 수 없습니다 (claude.ai에서 여세요).'); return; }
+  if (!s) { killSample(OFFMSG + ' claude.ai 아티팩트로 열었을 때만 동작합니다.'); return; }
   if (s.limits) s.limits().then(function (l) { if (l && l.maxPromptBytes > 0) MAXB = l.maxPromptBytes; }, function () { /* 기본 한도를 씀 */ });
 });
 /* 플랫폼이 입력 칸 값을 나중에 되살리는 경우에 대비해 한 번 더 셈 */

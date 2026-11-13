@@ -1,7 +1,7 @@
 /* ===== 교정·패러프레이즈 실행, 번역 실행, 탭 사이 보내기 ===== */
 
 var PRESETS = [
-  ['초록', '초록 형식: 한 문단, 문제 → 한 일 → 핵심 수치 결과 → 의의 순서, 인용·그림 언급·정의 안 된 약어 없이, 150단어 이내'],
+  ['초록', '초록 형식: 한 문단, 원문에 있는 내용만으로 문제 → 한 일 → 핵심 수치 결과 → 의의 순서(원문에 없는 부분은 지어내지 말고 건너뜀), 인용·그림 언급·정의 안 된 약어 없이, 150단어 이내'],
   ['그림 캡션', '그림 캡션 형식: 명사구 제목으로 시작, 패널은 (a), (b)로, 그림에 나온 기호와 약어를 모두 정의, 현재 시제'],
   ['심사 답변', '심사위원 답변 어조: 정중하고 직접적으로, 지적을 한 구절로 인정한 뒤 무엇을 어디서 고쳤는지(또는 동의하지 않는 기술적 이유를) 밝힘, 방어적이지 않게'],
   ['이메일', '업무 이메일: 첫 문장에 용건, 간결하고 정중하게, 요청 사항과 날짜를 분명히'],
@@ -38,7 +38,6 @@ function doneRun(tab, msg) {
   tab.review = null; tab.alt = null; tab.back = null; tab.sel = null; tab.undo = false;
   refresh(tab); setSide(tab, 'notes');
   setStatus(tab, msg, '');
-  say(msg);
   if (window.matchMedia && window.matchMedia('(max-width:760px)').matches && tab.out.scrollIntoView) tab.out.parentElement.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
@@ -62,7 +61,7 @@ function pUI() {
   P.in.placeholder = (fix ? '교정할' : '패러프레이즈할') + ' 영어·한국어 글을 붙여 넣으세요 — ' +
     (fix ? '문법·철자·어색한 표현을 고칩니다' : '뜻은 그대로 두고 표현을 바꿉니다') + ' · Ctrl+Enter 로 실행';
   P.in.lang = ko ? 'ko' : 'en';
-  $('p-again').textContent = fix ? '다시 교정' : '다른 표현 더';
+  $('p-again').textContent = fix ? '다시 교정' : '다른 안 더';
   $('p-again').title = fix ? '같은 글을 새로 교정합니다' : '같은 글로 앞선 안들과 다른 안을 더 받습니다';
   if (!P.res && !P.job.busy) paint(P);
   chips(P); sync(P);
@@ -171,7 +170,7 @@ async function runPolish(fresh) {
   }
   P.earlier.list = P.earlier.list.concat(newVs.map(function (v) { return v.out; }));
   var short = vs.length < n;
-  doneRun(P, (!resP.ok ? failText(resP) + ' ' : '') + '패러프레이즈 완료 · ' + newVs.length + '가지 안' +
+  doneRun(P, (!resP.ok ? failText(resP) + ' ' : '') + '패러프레이즈 완료 · 안 ' + newVs.length + '개' + (same ? ' 추가' : '') +
     (short ? ' (' + n + '가지 중 끝까지 온 것만)' : '') + (P.triple && n === 1 ? ' · 1,500자가 넘어 한 가지 안만 만들었습니다' : ''));
   saveRes(P);
 }
@@ -179,8 +178,8 @@ async function runPolish(fresh) {
 /* ---------- 번역 ---------- */
 function tUI() {
   var t = T.in.value, src = $('t-src').value, det = $('t-det');
-  if (src === 'auto' && t.trim().length >= 8) { var g = guessLang(t); det.textContent = '감지: ' + LANGKO[g]; det.dataset.l = g; }
-  else { det.textContent = ''; det.dataset.l = ''; }
+  if (src === 'auto' && t.trim().length >= 8) { var g = guessLang(t), dt = '감지: ' + LANGKO[g]; if (det.textContent !== dt) det.textContent = dt; det.dataset.l = g; }
+  else { if (det.textContent) det.textContent = ''; det.dataset.l = ''; }
   T.in.lang = LG[src === 'auto' ? (det.dataset.l || 'en') : src] || 'en';
   chips(T); sync(T);
 }
@@ -319,6 +318,7 @@ function swapLangs() {
   var same = !!r && !r.part && cur === r.text;
   var sv = sl.value !== 'auto' ? sl.value : (same ? r.src : guessLang(cur));
   var dv = same ? r.dst : d.value;
+  if (!LG[sv]) sv = guessLang(cur);
   if (sv === dv) sv = dv === 'ko' ? 'en' : 'ko';
   var moved = same ? curOut(T) : null;
   clearTab(T);

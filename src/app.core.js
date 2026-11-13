@@ -48,6 +48,16 @@ function setIn(ta, v) {
   if (!ok || ta.value !== v) ta.value = v;
   ta.dispatchEvent(new Event('input', { bubbles: true }));
 }
+/* 다시 그리는 동안 초점이 그 안에 있었으면, 같은 이름의 버튼(없으면 box 자신이나 가까운 설명 칸)으로 초점을 되돌림 */
+function keepFocus(box, fn) {
+  var a = document.activeElement, inside = !!a && a !== box && box.contains(a), key = inside ? a.textContent : '';
+  fn();
+  if (!inside || box.contains(document.activeElement)) return;
+  var c = box.querySelectorAll('button:not([disabled]), select, [tabindex="0"]'), hit = null;
+  for (var i = 0; i < c.length && !hit; i++) if (c[i].textContent === key) hit = c[i];
+  hit = hit || box.closest('.side') || c[0];
+  if (hit) hit.focus({ preventScroll: true });
+}
 /* 칩 묶음(nav.sub): 누른 칩에 aria-pressed */
 function pick(nav, v) {
   nav.querySelectorAll('button[data-v]').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.v === v ? 'true' : 'false'); });
@@ -77,7 +87,7 @@ var tier = $('tier');
 function modelOpts() { return MODELS[tier.value] || MODELS.quick; }
 function modelChip(r, mo) {
   if (r.modelApplied) return { t: mo.label, c: 'mute', tip: mo.label + ' · effort medium' };
-  if (r.modelTierApplied === mo.modelTier) return { t: mo.label + ' 대신 같은 등급 모델', c: 'mute', tip: '이 계정에서는 ' + mo.label + ' 을(를) 직접 지정할 수 없어 같은 등급의 기본 모델이 답했습니다.' };
+  if (r.modelTierApplied === mo.modelTier) return { t: mo.label + ' 대신 같은 등급 모델', c: 'mute', tip: '이 계정에서는 ' + mo.label + '를 직접 지정할 수 없어 같은 등급의 기본 모델이 답했습니다.' };
   return { t: '다른 등급 모델이 답함', c: 'mid', tip: '요청한 등급을 쓸 수 없어 다른 등급의 모델이 답했습니다.' };
 }
 
@@ -207,7 +217,8 @@ function live(tab, text) {
 /* ---------- 상태 줄 + 칩 ---------- */
 function setStatus(tab, text, cls, acts) {
   var k = tab.k, a = $(k + '-status-acts');
-  $(k + '-status').textContent = text || '';
+  var st = $(k + '-status');
+  if (st.textContent !== (text || '')) st.textContent = text || '';
   a.textContent = '';
   (acts || []).forEach(function (x) { a.appendChild(btnEl(x.label, 'sm', x.fn)); });
   $(k + '-statusbar').className = 'status' + (cls ? ' ' + cls : '');
@@ -236,7 +247,7 @@ function chips(tab) {
       box.appendChild(c);
     } else if (ig.total) box.appendChild(chipEl('수치·수식·인용 ' + ig.total + '개 그대로', 'ok', '원문의 숫자·수식·인용 번호가 결과에 모두 그대로 있습니다 (모델 없이 대조).'));
     var cap = wordCap(r.note);
-    if (cap && r.kind !== 'fix') {
+    if (cap && r.kind !== 'fix' && !(cap.unit === 'w' && (r.lang === 'ja' || r.lang === 'zh'))) {     /* 일본어·중국어는 띄어쓰기가 없어 단어 수를 셀 수 없음 */
       var n = cap.unit === 'w' ? wc(out) : cc(out);
       box.appendChild(chipEl(fmt(n) + ' / ' + fmt(cap.n) + (cap.unit === 'w' ? ' 단어' : ' 자'), n <= cap.n ? 'ok' : 'no', '맥락·지시에 적은 길이 한도'));
     }
@@ -283,7 +294,8 @@ function sync(tab) {
   } else {
     var okp = whole && (r.dst === 'ko' || r.dst === 'en');
     $('t-fix').disabled = $('t-para').disabled = busy || !okp;
-    $('t-fix').title = $('t-para').title = whole && !okp ? '교정·패러프레이즈는 영어·한국어만 됩니다' : '번역 결과를 교정·패러프레이즈 탭의 입력 칸으로 보냅니다';
+    $('t-fix').title = whole && !okp ? '교정·패러프레이즈는 영어·한국어만 됩니다' : '번역 결과를 교정·패러프레이즈 탭에 넣고 방식을 「교정」으로 맞춥니다';
+    $('t-para').title = whole && !okp ? '교정·패러프레이즈는 영어·한국어만 됩니다' : '번역 결과를 교정·패러프레이즈 탭에 넣고 방식을 「패러프레이즈」(같은 문체)로 맞춥니다';
     $('t-swap').disabled = busy;
     var bk = st.querySelector('[data-v="back"]');
     bk.hidden = !(whole && (r.dst === 'ja' || r.dst === 'zh'));
@@ -308,8 +320,10 @@ function paintOps(box, r) {
   r.ops.forEach(function (o, i) {
     if (o.s !== undefined) { box.appendChild(document.createTextNode(o.s)); return; }
     if (!realChange(o)) { box.appendChild(document.createTextNode(o.rej ? o.a : o.b)); return; }      /* 공백만 바뀐 곳은 표시 없이 */
-    var sp = el('span', { class: 'chg' + (o.rej ? ' rej' : ''), role: 'button', tabindex: '0', 'aria-pressed': o.rej ? 'true' : 'false', 'data-i': i,
-      title: o.rej ? '되돌린 수정입니다. 누르면 다시 적용합니다.' : '누르면 이 수정을 되돌립니다.' });
+    if (r.chgAt === undefined || !r.ops[r.chgAt] || !realChange(r.ops[r.chgAt])) r.chgAt = i;      /* 탭 정지는 하나만: 나머지는 화살표로 */
+    var sp = el('span', { class: 'chg' + (o.rej ? ' rej' : ''), role: 'button', tabindex: i === r.chgAt ? '0' : '-1', 'aria-pressed': o.rej ? 'true' : 'false', 'data-i': i,
+      'aria-label': (o.a && o.b ? '수정: 「' + o.a.trim() + '」 대신 「' + o.b.trim() + '」' : o.a ? '삭제: 「' + o.a.trim() + '」' : '추가: 「' + o.b.trim() + '」') + (o.rej ? ' (되돌림)' : ''),
+      title: (o.rej ? '되돌린 수정입니다. 누르면 다시 적용합니다.' : '누르면 이 수정을 되돌립니다.') + ' (← → 로 다음 수정)' });
     if (o.a) sp.appendChild(el('del', null, o.a));
     if (o.b) sp.appendChild(el('ins', null, o.b));
     box.appendChild(sp);
@@ -329,7 +343,7 @@ function paintPair(box, src, out) {
 function toggleChange(tab, i) {
   var r = tab.res;
   if (!r || !r.ops || !r.ops[i] || tab.job.busy) return;
-  r.ops[i].rej = !r.ops[i].rej;
+  r.ops[i].rej = !r.ops[i].rej; r.chgAt = i;
   r.versions[r.cur].out = composeChanges(r.ops);
   r.edited = true;
   if (tab.review) tab.review.stale = true;
@@ -443,8 +457,12 @@ function renderVers(tab) {
   nav.textContent = '';
   if (!r || r.part || r.kind !== 'para' || r.versions.length < 2) { nav.hidden = true; return; }
   nav.hidden = false;
+  nav.appendChild(el('span', { class: 'sep' }, '안 ·'));
+  var VTIP = { '기본': '뜻을 지키면서 자연스럽게 다시 쓴 안', '가깝게': '원문의 구조를 거의 그대로 두고 조금만 바꾼 안', '과감하게': '문장 구조까지 크게 바꾼 안' };
   r.versions.forEach(function (v, i) {
-    nav.appendChild(el('button', { type: 'button', 'data-v': String(i), 'aria-pressed': i === r.cur ? 'true' : 'false' }, v.label));
+    var b = el('button', { type: 'button', 'data-v': String(i), 'aria-pressed': i === r.cur ? 'true' : 'false' }, v.label);
+    b.title = VTIP[v.label.replace(/ \d+$/, '')] || '';
+    nav.appendChild(b);
   });
 }
 function renderView(tab) {

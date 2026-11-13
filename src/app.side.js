@@ -18,7 +18,7 @@ function paneKeep(pane, running) {
   return false;
 }
 function renderSide(tab) {
-  renderNotes(tab); renderReview(tab); renderAlt(tab);
+  keepFocus($(tab.k + '-pane-notes'), function () { renderNotes(tab); }); renderReview(tab); renderAlt(tab);
   if (tab.k === 't') renderBack(tab);
   if (tab.side === 'back' && !(tab.res && !tab.res.part && (tab.res.dst === 'ja' || tab.res.dst === 'zh'))) setSide(tab, 'notes');
 }
@@ -89,7 +89,7 @@ function renderNotes(tab) {
   if (r.part) hd.appendChild(chipEl('미완성', 'mid'));
   if (r.kind === 'para' && !r.part) {
     hd.appendChild(chipEl(v.label, 'mute'));
-    hd.appendChild(chipEl('일반 낱말 재사용 ' + overlapPct(r.text, out, r.lang) + '%', 'mute', '결과의 낱말 가운데 원문에도 있는 비율입니다 (the, of 같은 기능어 제외). 낮을수록 많이 바꾼 글입니다.'));
+    hd.appendChild(chipEl('원문 구절 재사용 ' + phrasePct(r.text, out, r.lang) + '%', 'mute', '결과의 세 단어 묶음 가운데 원문에도 그대로 있는 비율입니다. 용어와 숫자는 그대로여도 문장을 다시 지었으면 낮아집니다.'));
   }
   if (r.kind === 'fix' && r.ops && !r.part) {
     var ch = r.ops.filter(realChange), rej = ch.filter(function (o) { return o.rej; }).length;
@@ -121,6 +121,7 @@ function renderNotes(tab) {
     pane.appendChild(ul);
   } else pane.appendChild(el('div', { class: 'msg' }, r.part ? '설명은 글이 끝까지 와야 나옵니다.' : '설명이 오지 않았습니다.'));
   var real = lines.filter(function (l) { return !/고칠 곳이 없습니다|특기 사항 없음|더 없습니다/.test(l); }).length;
+  if (r.kind === 'fix' && r.ops && !r.part) real = r.ops.filter(realChange).length;      /* 교정은 머리줄의 '수정 N곳'과 같은 수 */
   nChip.hidden = !real; nChip.textContent = real;
 }
 
@@ -151,7 +152,8 @@ function reviewChips(rv) {
     !N.length ? (lowN ? chipEl('가벼운 손질 ' + lowN + '건', 'mute') : chipEl('어색한 곳 없음', 'ok')) : (N.length <= 3 && !hi ? chipEl('어색한 곳 ' + N.length + '건', 'mid') : chipEl('다시 손보기 권장', 'no'))
   ];
 }
-function renderReview(tab) {
+function renderReview(tab) { keepFocus($(tab.k + '-pane-review'), function () { drawReview(tab); }); }
+function drawReview(tab) {
   var k = tab.k, pane = $(k + '-pane-review'), rv = tab.review, nChip = $(k + '-review-n');
   var kept = paneKeep(pane, !!rv && rv.running);
   if (!rv) {
@@ -212,7 +214,7 @@ function renderReview(tab) {
           b.setAttribute('aria-pressed', it.on ? 'true' : 'false');
           acts.appendChild(b);
           if (it.dead) acts.appendChild(el('span', { class: 'meta' }, '켜 둔 다른 수정과 겹쳐 적용하지 못했습니다. 그 수정을 풀면 적용할 수 있습니다.'));
-        } else acts.appendChild(el('span', { class: 'meta' }, !it.fix || it.fix === it.quote ? '바꿀 문구가 오지 않았습니다. 설명을 보고 직접 고치세요.' : rv.base.indexOf(it.quote) >= 0 ? '이 구절이 결과에 여러 번 나와 자동으로 바꾸지 못합니다. 직접 고치세요.' : '결과에서 이 구절을 찾지 못해 직접 고쳐야 합니다'));
+        } else acts.appendChild(el('span', { class: 'meta' }, !it.fix || it.fix === it.quote ? '바꿀 문구가 오지 않았습니다. 설명을 보고 직접 고치세요.' : rv.base.indexOf(it.quote) >= 0 ? '이 구절이 결과에 여러 번 나와 자동으로 바꾸지 못합니다. 직접 고치세요.' : '결과에서 이 구절을 찾지 못했습니다. 직접 고치세요.'));
         if (acts.childNodes.length) li.appendChild(acts);
         if (!rv.stale) locatable(tab, li, function () { if (it.on) return it.fix; var o = curOut(tab), h = findOnce(o, it.quote); return h ? o.substr(h.at, h.len) : it.quote; });
       }
@@ -328,7 +330,8 @@ function sentencePicker(tab) {
   sel.onchange = function () { if (sel.value !== '') { tab.sel = spans[+sel.value]; tab.selMsg = ''; renderAlt(tab); } };
   return sel;
 }
-function renderAlt(tab) {
+function renderAlt(tab) { keepFocus($(tab.k + '-pane-alt'), function () { drawAlt(tab); }); }
+function drawAlt(tab) {
   var k = tab.k, pane = $(k + '-pane-alt'), r = tab.res, al = tab.alt;
   var kept = paneKeep(pane, !!r && !r.part && !!al && al.running);
   if (!r || r.part) {
@@ -341,7 +344,7 @@ function renderAlt(tab) {
   if (!kept) pane.appendChild(hd);
   if (!isPlainView(tab)) {
     pane.appendChild(el('div', { class: 'msg' }, r.kind === 'fix' ? '「깨끗한 글」 보기에서 구절을 고를 수 있습니다.' : '「' + (r.kind === 'tr' ? '번역문' : '새 글') + '」 보기에서 구절을 고를 수 있습니다.'));
-    pane.appendChild(btnEl(r.kind === 'fix' ? '깨끗한 글로 보기' : '그 보기로 바꾸기', '', function () {
+    pane.appendChild(btnEl(r.kind === 'fix' ? '깨끗한 글로 보기' : '「' + (r.kind === 'tr' ? '번역문' : '새 글') + '」 보기로 바꾸기', '', function () {
       if (r.kind === 'fix') tab.vFix = 'clean'; else tab.vText = 'new';
       paint(tab); renderView(tab); renderAlt(tab); saveSettings();
     }));
@@ -414,7 +417,8 @@ async function runAlt(tab) {
 }
 
 /* ---------- 역번역 (번역 탭, 일본어·중국어 결과만) ---------- */
-function renderBack(tab) {
+function renderBack(tab) { keepFocus($('t-pane-back'), function () { drawBack(tab); }); }
+function drawBack(tab) {
   var pane = $('t-pane-back'), bk = tab.back, r = tab.res;
   var kept = paneKeep(pane, !!bk && bk.running);
   var hd = el('div', { class: 'hd' });
